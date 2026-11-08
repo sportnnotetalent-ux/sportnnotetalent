@@ -38,7 +38,7 @@ import { removeFieldEntry } from './golf';
 import { applyRecordOps, recordOpsFor, bestRecords, type RecordOp } from './results/recordBook';
 import { updateFieldEventFormat } from './golf';
 import { finalAlert, combinedAlert, type ResultAlert } from './results/alerts';
-import { phaseRules, zeroLanes, type CompRules } from './results/competitionRules';
+import { newEventRules, phaseRules, zeroLanes, type CompRules } from './results/competitionRules';
 // Reads past PostgREST's 1,000-row cap (stable order + .range; long .in() lists chunked).
 import { fetchAllPages, fetchAllChunked, chunk } from './paging';
 
@@ -213,8 +213,11 @@ export async function createResultsEvent(input: NewResultsEvent): Promise<FieldE
   const base = disciplineOf(input.discipline);
   if (!base) throw new Error('Unknown discipline');
   const venueLanes = input.venueLanes && base.lanes && input.venueLanes !== base.lanes ? input.venueLanes : undefined;
-  // SD-141: the meet's competition rules (lane numbering, late lanes …) from the start
-  const rules = input.tournamentId ? await rulesForNewPhase(input.tournamentId, base.sport) : undefined;
+  // SD-141: the meet's competition rules (lane numbering, late lanes …) from the start.
+  // Wave 3 (defaults-on DOM3): a standalone event has no meet to read, so it
+  // starts on the new-event "Stats to track" (later rounds copy its rules).
+  const fresh = newEventRules(base.sport);
+  const rules = input.tournamentId ? await rulesForNewPhase(input.tournamentId, base.sport) : Object.keys(fresh).length ? fresh : undefined;
   const def = phaseDiscipline(base, { lanes: venueLanes, rules });
   if (!input.entrants.length) throw new Error('Add at least one entry.');
   if (def.teamSize && input.entrants.some((e) => e.playerId)) throw new Error(`${def.label} entries are teams, not athletes.`);

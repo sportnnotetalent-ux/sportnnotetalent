@@ -26,7 +26,7 @@ import { getMyPlayerId } from '../data/repos';
 import { meetAgeBasis } from '../data/useMeetAges';
 import { getEntriesDoc } from '../data/meetEntriesStore';
 import { getRulesLock, saveCompetitionRules, teamSportsOf, type RulesLock } from '../data/competitionRulesStore';
-import { rulesFor, ruleShown, capsText, parseClassList, type EntryCaps, type RuleDef, type RuleValue } from '../data/results';
+import { rulesFor, ruleShown, standardOf, capsText, parseClassList, type EntryCaps, type RuleDef, type RuleValue } from '../data/results';
 import { isEventSport } from '../sports/eventSports';
 import { getSportMeta } from '../sports/sportMeta';
 import type { SportId } from '../core/types';
@@ -78,12 +78,14 @@ export default function CompetitionRulesScreen() {
   const name = isEventSport(sport) ? getSportMeta(sport as SportId).name : sport;
 
   // what Save would write: only the keys that changed; a standard value is stored as "unset"
+  // — except a rule with a new-event value (wave 3, DOM8): the organiser's Off is
+  // kept, so a copy or a re-seed never turns it back on
   const changes = useMemo(() => {
     const out: Record<string, unknown> = {};
     for (const r of defs) {
       if (r.kind === 'age' || r.kind === 'caps') continue;
       const now = values[r.key], was = saved[r.key];
-      const norm = (v: unknown) => (v === undefined || v === null || v === '' || (v === r.default && !r.existing) ? undefined : v);
+      const norm = (v: unknown) => (v === undefined || v === null || v === '' || (v === r.default && !r.existing && r.newEvents === undefined) ? undefined : v);
       if (norm(now) !== norm(was)) out[r.key] = norm(now);
     }
     return out;
@@ -111,7 +113,8 @@ export default function CompetitionRulesScreen() {
     const ok = await askConfirm({ title: 'Back to the standard rules?', message: 'Every choice on this page goes back to its standard default. Nothing is saved until you tap Save rules.', yesLabel: 'Yes, use standard', noLabel: 'No, keep mine', tone: 'caution' });
     if (!ok) return;
     const d: Record<string, unknown> = { ...(draft ?? saved) };
-    for (const r of defs) if (r.kind === 'choice' || r.kind === 'text') d[r.key] = r.default;
+    // wave 3 (DOM7): back to what a new tournament starts on, new defaults included
+    for (const r of defs) if (r.kind === 'choice' || r.kind === 'text') d[r.key] = standardOf(r);
     setDraft(d);
     setCaps(null);
   };
@@ -149,7 +152,7 @@ export default function CompetitionRulesScreen() {
                 {r.kind === 'choice' && (
                   <View style={{ gap: theme.spacing(1) }} accessibilityRole="radiogroup">
                     {r.choices!.map((c) => (
-                      <Choice key={String(c.value)} label={c.label} standard={c.value === r.default} on={valueOf(r) === c.value} disabled={!editable} onPress={() => set(r.key, c.value)} />
+                      <Choice key={String(c.value)} label={c.label} standard={c.value === standardOf(r)} on={valueOf(r) === c.value} disabled={!editable} onPress={() => set(r.key, c.value)} />
                     ))}
                   </View>
                 )}

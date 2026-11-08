@@ -13,6 +13,7 @@ import { effectiveQualifier, withLineResults, type LeaderMins } from './leaderMi
 import { collapseTies, isTieMatch, TIE_POINTS, tournamentTieSpec, type TieMatch } from './teamTie.ts';
 import { swissOpsOf, swissExtraRounds, type SwissExtraRound } from './swissOps.ts';
 import { tqbAmong, battingAvgAmong, BASEBALL_TIE_BREAKERS } from '../sports/baseball/tqb.ts';
+import { newEventRules } from './results/competitionRules.ts';
 
 export interface TeamStanding {
   teamId: string;
@@ -612,7 +613,10 @@ export const NEW_TOURNAMENT_POINTS: Partial<Record<SportId, Record<string, numbe
 /** A new tournament's format for one sport: the international points keys
  *  under whatever the organiser already chose (their keys win). */
 export function withNewTournamentPoints<T extends Record<string, unknown>>(sport: SportId, fmt?: T | null): T {
-  const out = { ...(NEW_TOURNAMENT_POINTS[sport] ?? {}), ...(fmt ?? {}) } as T;
+  // Wave 3 (defaults-on DOM1): the measured sports' new-event "Stats to track"
+  // (weightlifting jury reversals, archery team arrows per archer) are written
+  // here too, at creation — their read fallback stays OFF for old events.
+  const out = { ...(NEW_TOURNAMENT_POINTS[sport] ?? {}), ...newEventRules(sport), ...(fmt ?? {}) } as T;
   // SD-136: a beach volleyball tournament still on the indoor default starts on
   // the FIVB Beach table instead (an organiser's own pick is kept).
   if (sport === 'volleyball' && (out as Record<string, unknown>).preset === 'beach' && activePreset(sport, out)?.id === 'fivb') {
@@ -629,10 +633,11 @@ export function withNewTournamentPoints<T extends Record<string, unknown>>(sport
 }
 
 /** Every sport of a tournament being created, stamped with `withNewTournamentPoints`
- *  (the choke point in `createTournament`, so every creation path gets D1). */
+ *  (the choke point in `createTournament`, so every creation path gets D1 and
+ *  the wave-3 measured new-event rules). */
 export function newTournamentFormats<F extends Record<string, unknown>>(sports: SportId[], formats?: Partial<Record<SportId, F>> | null): Partial<Record<SportId, F>> {
   const out: Partial<Record<SportId, F>> = { ...(formats ?? {}) };
-  for (const sp of sports) if (NEW_TOURNAMENT_POINTS[sp]) out[sp] = withNewTournamentPoints(sp, out[sp] ?? ({} as F));
+  for (const sp of sports) if (NEW_TOURNAMENT_POINTS[sp] || Object.keys(newEventRules(sp)).length) out[sp] = withNewTournamentPoints(sp, out[sp] ?? ({} as F));
   return out;
 }
 

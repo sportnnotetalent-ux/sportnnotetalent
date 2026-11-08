@@ -287,8 +287,16 @@ export function winnerSplitStory(def: Pick<DisciplineDef, 'key'>, rows: RankedEn
   const win = rows.find((r) => r.position === 1);
   const ds = win ? splitDistancesFor(def.key, win.entry.result) : [];
   if (!ds.length || !win || !win.entry.result.splits?.some((x) => x != null)) return null;
-  const places = splitPlacesFor(def, rows.filter((r) => r.status === 'ok').map((r) => ({ id: r.id, result: r.entry.result }))).get(win.id) ?? [];
-  const known = places.map((p, i) => ({ p, at: ds[i] })).filter((x) => x.p != null) as { p: number; at: number }[];
+  const ok = rows.filter((r) => r.status === 'ok');
+  const places = splitPlacesFor(def, ok.map((r) => ({ id: r.id, result: r.entry.result }))).get(win.id) ?? [];
+  // defaults-on DOM12: a split point tells a story only when at least two
+  // finishers were timed there — the winner alone "led" nobody
+  const timedAt = (d: number) => ok.filter((r) => {
+    const rds = splitDistancesFor(def.key, r.entry.result);
+    const k = rds.indexOf(d);
+    return k >= 0 && r.entry.result.splits?.[k] != null;
+  }).length;
+  const known = (places.map((p, i) => ({ p, at: ds[i] })).filter((x) => x.p != null) as { p: number; at: number }[]).filter((x) => timedAt(x.at) >= 2);
   if (!known.length) return null;
   if (known.every((x) => x.p === 1)) return known.length > 1 ? 'led at every split' : `led at ${distanceLabel(known[0].at)}`;
   const last = known[known.length - 1];
@@ -313,6 +321,8 @@ export function fastestFinish(def: Pick<DisciplineDef, 'key'>, rows: RankedEntry
   if (!segs.length) return null;
   const count = (l: string) => segs.filter((x) => x.label === l).length;
   const label = segs.map((x) => x.label).reduce((a, b) => (count(b) > count(a) ? b : a));
+  // defaults-on DOM12: "fastest" needs at least two finishers on that segment
+  if (count(label) < 2) return null;
   return segs.filter((x) => x.label === label).reduce((a, b) => (b.seg < a.seg ? b : a));
 }
 

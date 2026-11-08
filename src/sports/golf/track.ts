@@ -34,6 +34,12 @@ export function trackHint(k: GolfTrackKey, unit: DistUnit): string {
   return GOLF_TRACK_LABEL[k].hint;
 }
 
+/** Wave 3 (docs/sport-expert/defaults-on/measured.md, defaults-on DOM5): what a
+ *  NEW round's setup starts on — every tap stat; driving distance stays off
+ *  (typed, needs a rangefinder). Only the setup's starting value: the phone
+ *  fallback stays [] so a round already in play (no `format.track`) is unchanged. */
+export const NEW_ROUND_TRACK: GolfTrackKey[] = ['putts', 'fairway', 'bunker', 'upDown', 'penalties', 'firstPutt'];
+
 /** The SD-45 stats row as a track set (a phone that had it switched on). */
 export const LEGACY_STATS_ROW: GolfTrackKey[] = ['putts', 'fairway', 'bunker', 'penalties'];
 

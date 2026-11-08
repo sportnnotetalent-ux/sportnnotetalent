@@ -5,8 +5,11 @@
  * this list into COMPETITION_RULES, so it must not import it at runtime).
  *
  * Founder rules: the default entry stays as fast as today — every extra
- * capture is OFF until the organiser switches it on; a rule that varies has
- * the federation's standard as its default. Like every competition rule they
+ * capture that costs a tap or needs equipment is OFF until the organiser
+ * switches it on (wave 3, docs/sport-expert/defaults-on/measured.md: jury
+ * reversals and team arrows per archer cost nothing, so a NEW tournament
+ * starts them ON via `newEvents`; `default` stays OFF so old events read
+ * OFF). A rule that varies has the federation's standard as its default. Like every competition rule they
  * are set before the meet and read-only once results exist; `phase: true`
  * copies a changed value onto each phase (`PhaseFormat.rules`), where the
  * scoring cards read it with `ruleOf`.
@@ -28,7 +31,7 @@ export const PRECISION_RULES: RuleDef[] = [
     source: 'IWF TCRR: three referees, two white lights = good lift',
   },
   {
-    key: 'wlJury', sports: ['weightlifting'], group: 'Stats to track', label: 'Jury reversals', kind: 'choice', phase: true, default: false,
+    key: 'wlJury', sports: ['weightlifting'], group: 'Stats to track', label: 'Jury reversals', kind: 'choice', phase: true, default: false, newEvents: true, // defaults-on DOM1: ON for new tournaments; old events read OFF
     choices: [{ value: false, label: 'Off' }, { value: true, label: 'On — a “Jury reverses” button on each decision' }],
     help: 'The jury can overrule the referees (for example after a coach’s challenge). The final decision counts; the referees’ lights stay on record and the commentary says the jury reversed it.',
     source: 'IWF TCRR jury, as remembered (verify)',
@@ -92,9 +95,14 @@ export const PRECISION_RULES: RuleDef[] = [
     source: 'World Archery Book 3 (indoor faces) — see round-2 notes; single face = school default (founder)',
   },
   {
-    key: 'archTeamArrows', sports: ['archery'], group: 'Stats to track', label: 'Arrows per archer in team matches', kind: 'choice', phase: true, default: false,
+    key: 'archTeamArrows', sports: ['archery'], group: 'Stats to track', label: 'Arrows per archer in team matches', kind: 'choice', phase: true, default: false, newEvents: true, // defaults-on DOM1
     choices: [{ value: false, label: 'Off — each team’s arrows as one end' }, { value: true, label: 'On — enter each team’s arrows archer by archer' }],
     help: 'In team and mixed team matches each archer’s arrows are entered in turn, so every archer gets their own team-match arrows, average, 10s and X on their profile. The team’s score is the same either way.',
     source: 'World Archery team matches (2 arrows per archer an end) — see round-2 notes',
   },
 ];
+
+/** Wave 3 (defaults-on DOM14): the precision "Stats to track" keys a NEW
+ *  tournament starts ON (written at creation, never a changed fallback) — for
+ *  the "Use the new defaults" button. */
+export const MEASURED_NEW_DEFAULT_KEYS: string[] = PRECISION_RULES.filter((r) => r.newEvents !== undefined).map((r) => r.key);

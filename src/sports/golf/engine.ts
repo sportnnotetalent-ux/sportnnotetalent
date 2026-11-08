@@ -678,7 +678,11 @@ export function roundStats(card: GolfCard, holes: Hole[], received: number[]): R
   const udOn = !!tr?.includes('upDown') && entered(card.offGreen, (v) => typeof v === 'number' && Number.isFinite(v) && v >= 1);
   // (follow-up: chip-ins come free with it — a true 0 once off-green shots are entered)
   if (udOn) Object.assign(out, { udChances: 0, upDowns: 0, chipIns: 0 });
-  if (fairOn) Object.assign(out, { firLeft: 0, firRight: 0 });
+  // defaults-on DOM9 — missed left / right only once a fairway direction was
+  // entered on a par 4 / 5 (Fairways is on for new rounds; an untapped card
+  // never reads "Missed left 0")
+  const fairKept = fairOn && holes.some((h, i) => h.par >= 4 && (['L', 'hit', 'R'] as unknown[]).includes(card.firDir?.[i]));
+  if (fairKept) Object.assign(out, { firLeft: 0, firRight: 0 });
   if (puttOn) Object.assign(out, { scrambles: 0, scrambleHoles: 0, puttsGir: 0, girPutted: 0 });
   // NZG8 — sand saves only once a greenside bunker was tapped on the card
   const sandKept = sandOn && entered(card.bunker, (v) => v === true);
@@ -746,7 +750,7 @@ export function roundStats(card: GolfCard, holes: Hole[], received: number[]): R
       out.longDrive = Math.max(out.longDrive ?? 0, yd);
     }
     // SD-45 — derived from the stats row (keyed: only stats-mode cards carry them)
-    if (fairOn) {
+    if (fairKept) {
       if (dir === 'L' && h.par >= 4) out.firLeft += 1;
       if (dir === 'R' && h.par >= 4) out.firRight += 1;
     }

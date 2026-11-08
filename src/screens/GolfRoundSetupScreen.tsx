@@ -28,7 +28,7 @@ import { GolfCourseEditor, type CourseDraft } from '../components/golf/GolfCours
 import { isSupabaseConfigured } from '../core/supabase';
 import { getSportMeta } from '../sports/sportMeta';
 import { holesFor, makesCut, GOLF_TRACK_KEYS, type CutRule, type GolfTrackKey } from '../sports/golf/engine';
-import { GOLF_TRACK_LABEL, roundTrackOf, cleanTrack } from '../sports/golf/track';
+import { GOLF_TRACK_LABEL, NEW_ROUND_TRACK, roundTrackOf, cleanTrack } from '../sports/golf/track';
 import type { GolfCourse, Team } from '../core/types';
 import { golfTeamFormatOf, type GolfTeamFormat } from '../data/golfTeams';
 import { readGolfRounds } from '../data/tournamentCopyPlan';
@@ -66,8 +66,10 @@ export default function GolfRoundSetupScreen() {
     };
   });
   const [when, setWhen] = useState(() => new Date());
-  // batch 6 — the round's "Stats to track" for every marker (null = each marker's phone, as before)
-  const [track, setTrack] = useState<GolfTrackKey[] | null>(null);
+  // batch 6 — the round's "Stats to track" for every marker (null = each marker's phone, as before).
+  // Wave 3 (defaults-on DOM5): a new round starts on every tap stat; the next
+  // round / Run it again still take the previous round's setting below.
+  const [track, setTrack] = useState<GolfTrackKey[] | null>(() => [...NEW_ROUND_TRACK]);
   const [picks, setPicks] = useState<Pick[]>([]);
   const [groupSize, setGroupSize] = useState(4);
   const [interval, setIntervalMin] = useState(10);

@@ -43,6 +43,11 @@ export interface RuleDef {
   kind: 'choice' | 'text' | 'age' | 'caps';
   choices?: RuleChoice[];
   default: RuleValue;
+  /** Wave 3 (defaults-on DOM1): the value a NEW tournament (or a standalone
+   *  event) starts on, written into `formats[sport]` / the first phase when it
+   *  is created. `default` stays the read fallback, so an event that stored
+   *  nothing — every event made before — reads exactly as it did. */
+  newEvents?: RuleValue;
   /** where the default comes from; "verify" = read from memory, not from the rule book */
   source: string;
   /** the engine reads it while scoring — copied onto the sport's phases */
@@ -404,9 +409,23 @@ export function ruleValueLabel(r: RuleDef, v: unknown): string {
   return c?.label ?? String(v ?? '');
 }
 
-/** Rules whose value differs from the standard default (for the summary line). */
+/** Rules whose stored value differs from the standard (for the summary line). */
 export function changedRules(sport: string, fmt: Record<string, unknown> | null | undefined): RuleDef[] {
-  return rulesFor(sport).filter((r) => r.kind === 'choice' && fmt?.[r.key] !== undefined && fmt?.[r.key] !== null && fmt?.[r.key] !== '' && fmt?.[r.key] !== r.default);
+  return rulesFor(sport).filter((r) => r.kind === 'choice' && fmt?.[r.key] !== undefined && fmt?.[r.key] !== null && fmt?.[r.key] !== '' && fmt?.[r.key] !== standardOf(r));
+}
+
+/** The standard a new tournament starts on: the new-event value where there
+ *  is one (wave 3), else the default. "Back to standard" and the "· standard"
+ *  mark use it. */
+export const standardOf = (r: RuleDef): RuleValue => (r.newEvents !== undefined ? r.newEvents : r.default);
+
+/** Wave 3 (defaults-on DOM1, DOM3): the rules a NEW tournament stores for a
+ *  sport, and a standalone event's first phase carries — only the rules whose
+ *  new-event value differs from the read fallback. {} for most sports. */
+export function newEventRules(sport: string): CompRules {
+  const out: CompRules = {};
+  for (const r of rulesFor(sport)) if (r.newEvents !== undefined && r.newEvents !== r.default) out[r.key] = r.newEvents;
+  return out;
 }
 
 /* ------------------------------- the lock ------------------------------- */
