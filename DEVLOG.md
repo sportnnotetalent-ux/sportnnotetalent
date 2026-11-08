@@ -38,6 +38,13 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Release: Android tab bar clears the navigation keys (web, Android OTA)
+
+auth-smoke passed and the publish lock was taken. Published from a clean worktree at 66f10a30.
+- **Web:** `index-d4ae74d5`, live on app.sportnnote.in.
+- **Android OTA:** `1394d8a4` (preview) / `05e0cb85` (production).
+- **Also included:** the shared DescribeCard (fc566f60), not used by any screen yet.
+
 ### 2026-11-08 — Android: the phone's navigation keys no longer cover the tab bar
 
 A friend's Android phone (3-button navigation) showed the back / home / recents keys over the app's bottom tabs (android-nav-overlap.md). Android 15 draws apps edge to edge behind a translucent navigation bar. The tab bar should add that bar's height, but on this phone the inset reached it as 0, while the top inset was fine.
