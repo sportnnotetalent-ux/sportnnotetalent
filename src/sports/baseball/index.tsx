@@ -65,6 +65,8 @@ import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import { baseballVoice, baseballVoiceEnds } from './voice';
 import { BASEBALL_META } from './meta';
 import { baseballMatchRecords } from './records';
+import { DescribeCard, useDescribeMarks } from '../../components/DescribeCard';
+import { fieldersStale } from './describe';
 
 const BASE_NAME = ['Home', '1st', '2nd', '3rd'];
 const DESTS: { to: Dest; label: string }[] = [{ to: -1, label: 'Out' }, { to: 1, label: '1B' }, { to: 2, label: '2B' }, { to: 3, label: '3B' }, { to: 4, label: 'Score' }];
@@ -138,7 +140,16 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
   /** round 2 (optional capture): the batted-ball type of this ball in play */
   const [btype, setBtype] = useState<BattedBall | null>(null);
   /** US batch 5: the fielded out just recorded, waiting for its optional fielders ("6-3") */
-  const [fieldFor, setFieldFor] = useState<{ ref: string; fielders: string } | null>(null);
+  const [fieldFor, setFieldFor] = useState<{ ref: string; fielders: string; seen?: boolean } | null>(null);
+  // describe-us: Done / Skip per out (its play id), held here so the next play opens fresh
+  const fieldMarks = useDescribeMarks<string>();
+  // DU3 / DU9: the card closes once its out is undone / removed, or a newer play (a tap or voice) is logged
+  // (`seen`: a play still on its way to the log doesn't close its own card)
+  useEffect(() => {
+    if (!fieldFor) return;
+    if (!fieldFor.seen) { if (view.events.some((e) => e.id === fieldFor.ref)) setFieldFor({ ...fieldFor, seen: true }); return; }
+    if (fieldersStale(view, fieldFor.ref)) setFieldFor(null);
+  }, [view.events, fieldFor]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (flow === null && editAfter !== null) { setEditAfter(null); dropHeldRemoval(); } }, [flow]); // eslint-disable-line react-hooks/exhaustive-deps
   // a cancelled play forgets its zone and type (a picked pitch type waits for the pitch)
   useEffect(() => { if (flow === null) { setZone(null); setBtype(null); } }, [flow]);
@@ -228,7 +239,9 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
   /** US batch 5: each tap notes the fielders on the recorded play ("6", then "6-3") */
   const tapFieldFor = (n: number) => {
     if (!fieldFor) return;
-    const next = fieldFor.fielders ? `${fieldFor.fielders}-${n}` : String(n);
+    // describe-us DU3: the note as the log has it (an Undo may have taken a tap back)
+    const have = view.events.find((e) => e.id === fieldFor.ref)?.fielders ?? '';
+    const next = have ? `${have}-${n}` : String(n);
     if (!isFieldersNote(next)) return;
     dispatch(fieldersAction(fieldFor.ref, next));
     setFieldFor({ ...fieldFor, fielders: next });
@@ -286,21 +299,26 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
   };
 
   /* ---- US batch 5: fielders after the play (optional; any next play closes it) ---- */
+  // describe-us (US-DON-3): the shared describe card — a full-width Done under
+  // "✓ 6-3" (Skip when nothing is noted), then "✓ Saved · 6-3 … Edit"
+  const fieldEv = fieldFor ? view.events.find((e) => e.id === fieldFor.ref) : undefined;
   const fieldersBox = fieldFor ? (
-    <View style={c.panel} accessibilityLabel="Fielders for the last out (optional)">
-      <View style={c.flowHead}>
-        <Text style={c.small}>Fielders? (optional){fieldFor.fielders ? ` · ${fieldFor.fielders}` : ''}</Text>
-        <Text style={c.cancel} accessibilityRole="button" onPress={() => setFieldFor(null)}>{fieldFor.fielders ? 'Done' : 'Skip'}</Text>
-      </View>
-      <View style={c.grid}>
+    <DescribeCard
+      title={`Last out${fieldEv?.outcome ? ` · ${OUTCOME_LABEL[fieldEv.outcome]}` : ''} — fielders? (optional)`}
+      summary={fieldEv?.fielders ?? ''}
+      mode={fieldMarks.modeOf(fieldFor.ref)}
+      onDone={() => fieldMarks.mark(fieldFor.ref, 'done')}
+      onSkip={() => fieldMarks.mark(fieldFor.ref, 'skipped')}
+      onEdit={() => fieldMarks.mark(fieldFor.ref, null)}>
+      <View style={c.grid} accessibilityLabel="Fielders for the last out (optional)">
         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
           <TouchableOpacity key={n} accessibilityRole="button" accessibilityLabel={`Fielder ${n}, ${POSITIONS[n - 1]}`} style={c.num} onPress={() => tapFieldFor(n)}>
             <Text style={c.numTxt}>{n}</Text>
           </TouchableOpacity>
         ))}
-        {fieldFor.fielders ? <TouchableOpacity accessibilityRole="button" accessibilityLabel="Clear the fielders" style={c.num} onPress={clearFieldFor}><Text style={c.numTxt}>Clear</Text></TouchableOpacity> : null}
+        {fieldEv?.fielders ? <TouchableOpacity accessibilityRole="button" accessibilityLabel="Clear the fielders" style={c.num} onPress={clearFieldFor}><Text style={c.numTxt}>Clear</Text></TouchableOpacity> : null}
       </View>
-    </View>
+    </DescribeCard>
   ) : null;
 
   /* ---- after the last out ---- */

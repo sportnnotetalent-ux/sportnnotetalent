@@ -47,6 +47,8 @@ import {
 import { BASKETBALL_META } from './meta';
 import { basketballUndoLabel } from './undoLabel';
 import { basketballMatchRecords } from './records';
+import { DescribeCard, useDescribeMarks } from '../../components/DescribeCard';
+import { assistCard, assistOwn, blockCard, blockOwn, cardStale, describesDrawn, foulCard, foulDrawnAction, foulOwn, tagAction } from './describe';
 
 /** SD-117 (B12): the foul-type chips, FIBA's U and D included. */
 // FIBA 2026 (from 1 Oct 2026, basketball-rulebook.md BK-1/2): disruptive and flagrant
@@ -87,11 +89,12 @@ const Row = ({ label, roster, onPick, disabledFor }: { label: string; roster: Pl
 /** A multi-step capture in progress: free throws, foul-type pick, off/def rebound,
  *  a substitution, or setting the starting five. */
 type Flow =
-  | { kind: 'ft'; side: 'home' | 'away'; shooter?: Player; reason?: string; remaining?: number; total?: number }
+  // describe-us DU12: `foulTrip` = the free throws of the foul whose "who was fouled?" card is open
+  | { kind: 'ft'; side: 'home' | 'away'; shooter?: Player; reason?: string; remaining?: number; total?: number; foulTrip?: true }
   // SD-117 (B3): a player picked first, then the action — no row of look-alike chips to mis-tap
   | { kind: 'act'; side: 'home' | 'away'; player: Player }
-  // Deep wave: with "Fouls drawn" on, the type is kept while the fouled player is picked
-  | { kind: 'foul'; side: 'home' | 'away'; fouler?: Player; type?: FoulType; team?: true }
+  // describe-us DU1: the type tap logs the foul — who was fouled is an optional card after
+  | { kind: 'foul'; side: 'home' | 'away'; fouler?: Player; team?: true }
   | { kind: 'rebound'; side: 'home' | 'away'; player: Player }
   | { kind: 'sub'; side: 'home' | 'away'; off?: Player }
   // IDs-only scoring: the five by player id
@@ -131,7 +134,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   // Deep wave: the same box offers "⚡ Fast break" (tags the basket) and, with
   // Shot zones on, "🔗 And-one" (the bonus free throw).
   // MVP B6: `fromSeq` = the log counter when the basket was made; `ref` = that basket, once on the board
-  const [assistFor, setAssistFor] = useState<{ side: 'home' | 'away'; scorer?: Player; points: number; fb?: boolean; fromSeq?: number; ref?: number } | null>(null);
+  const [assistFor, setAssistFor] = useState<{ side: 'home' | 'away'; scorer?: Player; points: number; fromSeq?: number; ref?: number } | null>(null);
   // MVP B6: the prompt finds its basket (the first of that side logged after it
   // opened) and closes if Undo removes it — no phantom assist.
   useEffect(() => {
@@ -154,6 +157,24 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     if (stealFor) { const r = find('steal', stealFor); if (r === -1) setStealFor(null); else if (r != null && r !== stealFor.ref) setStealFor({ ...stealFor, ref: r }); }
     if (blockFor) { const r = find('block', blockFor); if (r === -1) setBlockFor(null); else if (r != null && r !== blockFor.ref) setBlockFor({ ...blockFor, ref: r }); }
   }, [stealFor, blockFor, state.events]);
+  // describe-us DU1: "who was fouled?" after the foul is on the board (optional;
+  // with "Fouls drawn" on). `fromSeq` finds the foul (`ref`); its own free
+  // throws keep the card open (DU12).
+  const [foulFor, setFoulFor] = useState<{ side: 'home' | 'away'; fromSeq: number; ref?: number } | null>(null);
+  // describe-us: Done / Skip per play, held here so a card that closes still remembers and the next play opens fresh
+  const marks = useDescribeMarks<string>();
+  // describe-us DU3 / DU9: each card finds its play, and closes once the play
+  // is gone (Undo / Remove) or a newer play — a tap or voice — is logged
+  useEffect(() => {
+    if (assistFor?.ref != null && cardStale(state, assistFor.ref, assistOwn(state, assistFor.ref))) setAssistFor(null);
+    if (blockFor?.ref != null && cardStale(state, blockFor.ref, blockOwn(state, blockFor.ref))) setBlockFor(null);
+    if (foulFor) {
+      if (foulFor.ref == null) {
+        const f = state.events.find((e) => e.type === 'foul' && e.side === foulFor.side && e.id > foulFor.fromSeq);
+        if (f) setFoulFor({ ...foulFor, ref: f.id });
+      } else if (cardStale(state, foulFor.ref, foulOwn(state, foulFor.ref))) setFoulFor(null);
+    }
+  }, [assistFor, blockFor, foulFor, state.events]);
   // IDs-only scoring: the log names players by id; this viewer's names (the
   // squads' as the fallback) are put in when shown.
   const { nameOf: viewerNameOf } = useMask();
@@ -179,9 +200,14 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   const fire = (action: ScoreAction) => {
     setAssistFor(null);
     setReboundFor(null); setStealFor(null); setBlockFor(null);
+    // describe-us DU12: the foul's own free throws keep its card open
+    if (!(action.type === 'FREE_THROW' && flow?.kind === 'ft' && flow.foulTrip)) setFoulFor(null);
     // SD-122: `v: 2` = foul-out / ejection are checked for this side (and id).
-    dispatch({ ...action, payload: { ...action.payload, ...stampFor(), v: 2 } });
+    dispatch(stamped(action));
   };
+  // SD-122 stamps; describe-us: a card's own detail is stamped the same but
+  // closes no card (it describes the play the card is about)
+  const stamped = (action: ScoreAction): ScoreAction => ({ ...action, payload: { ...action.payload, ...stampFor(), v: 2 } });
 
   // SD-31: "Track missed shots" (live settings) — Miss buttons, and every make
   // counts as an attempt (`fga`) so FGA / FG% / EFF are complete.
@@ -306,13 +332,18 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     // US batch 5 (FIBA Art. 37 / 38): U / D / flagrant / disruptive — the free throws and then the ball
     const keep = ballAfterFoul(type);
     const bonus = shots > 0 && (type === 'personal');
+    const fromSeq = state.seq; // describe-us: finds the foul for its card
     // Deep wave: "Fouls drawn" — the foul says it was tracked, and who drew it (by id)
     const drawn = state.trackFoulsDrawn ? { fdt: true, drawnBy } : {};
     fire(foulAction(side, fouler, type, { ...drawn, ...(cat2 ? { cat2: true } : {}) }));
     if (dq && fouler) fireEject(side, fouler, dq);
+    // describe-us DU1: the foul is on the board; "who was fouled?" is an
+    // optional card after it (a player's foul, not a technical; live plays only)
+    const ask = !!state.trackFoulsDrawn && !!fouler && !drawnBy && describesDrawn({ type: 'foul', foulType: type }) && !edit;
+    if (ask) setFoulFor({ side, fromSeq });
     if (shots > 0) {
       const why = bonus ? `Bonus — ${teamOf(side)} are over the team-foul limit` : `${FOUL_LABEL[type]} foul on ${fouler?.fullName ?? teamOf(side)}`;
-      setFlow({ kind: 'ft', side: opp(side), ...(drawnBy && type !== 'technical' ? { shooter: drawnBy } : {}), remaining: shots, total: shots, reason: `${why}${dq && fouler ? ` · ${fouler.fullName} disqualified` : ''} — ${shots} free throw${shots > 1 ? 's' : ''} for ${teamOf(opp(side))}${ball ? `, then ${teamOf(opp(side))} keep the ball (team foul ${teamFoulsThisQuarter(state, side) + 1})` : keep ? `, then ${teamOf(opp(side))} keep the ball (throw-in)` : ''}` });
+      setFlow({ kind: 'ft', side: opp(side), ...(ask ? { foulTrip: true as const } : {}), ...(drawnBy && type !== 'technical' ? { shooter: drawnBy } : {}), remaining: shots, total: shots, reason: `${why}${dq && fouler ? ` · ${fouler.fullName} disqualified` : ''} — ${shots} free throw${shots > 1 ? 's' : ''} for ${teamOf(opp(side))}${ball ? `, then ${teamOf(opp(side))} keep the ball (team foul ${teamFoulsThisQuarter(state, side) + 1})` : keep ? `, then ${teamOf(opp(side))} keep the ball (throw-in)` : ''}` });
     } else setFlow(null);
   };
 
@@ -431,25 +462,13 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
                 ))}
               </View>
             </>
-          ) : flow.type ? (
-            // Deep wave — "Fouls drawn": who was fouled (optional; a shooting
-            // foul's free throws then open with that shooter picked)
-            <>
-              <Text style={ctrl.meta}>{FOUL_LABEL[flow.type]} foul on {flow.fouler.fullName} — who was fouled? ({teamOf(opp(flow.side))})</Text>
-              <View style={ctrl.chips}>
-                {courtOf(opp(flow.side)).map((p) => (
-                  <SelectChip key={p.id} label={p.fullName} active={false} disabled={fouledOut(p)} onPress={() => void recordFoul(flow.side, flow.fouler!, flow.type!, p)} />
-                ))}
-                <SelectChip label="Skip" active={false} onPress={() => void recordFoul(flow.side, flow.fouler!, flow.type!, null)} />
-              </View>
-            </>
           ) : (
             <>
               <Text style={ctrl.meta}>{flow.fouler.fullName} — what kind of foul?</Text>
               <View style={ctrl.chips}>
                 {FOUL_CHOICES.map((c) => (
                   <SelectChip key={c.key} label={c.label} active={false}
-                    onPress={() => (state.trackFoulsDrawn && c.type !== 'technical' ? setFlow({ ...flow, type: c.type }) : void recordFoul(flow.side, flow.fouler!, c.type, undefined, undefined, c.cat2))} />
+                    onPress={() => void recordFoul(flow.side, flow.fouler!, c.type, undefined, undefined, c.cat2)} />
                 ))}
               </View>
               <Text style={ctrl.meta}>Free throws open next with the count filled in: technical 1; shooting, disruptive, flagrant, D 2; a personal foul in the bonus 2. A D foul, or any two of technical (behaviour) / flagrant, disqualifies (asks first). Disruptive fouls and delay / ring technicals never do (FIBA 2026).</Text>
@@ -636,8 +655,39 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   const backfillBar = backfillQ != null
     ? <BackfillBar at={periodLabel(backfillQ, state.regPeriods)} onLive={() => setBackfillQ(null)} /> : null;
 
+  // describe-us DU1 / DU12: "who was fouled?" — the foul is already on the
+  // board. Under the pads, and above its own free throws, where the pick also
+  // names the shooter until the first shot (the one-step flow's pre-pick).
+  const foulCardEl = (() => {
+    if (!foulFor || foulFor.ref == null) return null;
+    const { foul, drawnPid, drawn } = foulCard(state, foulFor.ref);
+    if (!foul || !describesDrawn(foul)) return null;
+    const key = `f${foulFor.fromSeq}`;
+    const fouled = opp(foul.side);
+    const summary = drawnPid || drawn ? `Fouled: ${pName(drawnPid, drawn)}` : '';
+    const pickDrawn = (p: Player) => {
+      if (drawnPid === p.id) { dispatch(foulDrawnAction(foul.side, foul.id, null)); return; }
+      dispatch(foulDrawnAction(foul.side, foul.id, p));
+      if (flow?.kind === 'ft' && flow.foulTrip && !flow.shooter && flow.remaining === flow.total) setFlow({ ...flow, shooter: p });
+    };
+    return (
+      <DescribeCard title={`Last foul · ${FOUL_LABEL[foul.foulType ?? 'personal']} on ${pName(foul.pid, foul.playerName)} — who was fouled? (${teamOf(fouled)})`}
+        summary={summary} mode={marks.modeOf(key)} onDone={() => marks.mark(key, 'done')} onSkip={() => marks.mark(key, 'skipped')} onEdit={() => marks.mark(key, null)}>
+        <View style={ctrl.chips}>
+          {/* DU11: a player who is out can't be named */}
+          {courtOf(fouled).filter((p) => !fouledOut(p)).map((p) => (
+            <SelectChip key={p.id} label={p.fullName} active={drawnPid === p.id} accessibilityLabel={`Fouled: ${p.fullName}`} onPress={() => pickDrawn(p)} />
+          ))}
+        </View>
+      </DescribeCard>
+    );
+  })();
+
   // A capture is mid-flow (free throws, foul type, rebound off/def, sub, five).
-  if (flow) return backfillBar ? <View style={{ gap: theme.spacing(3) }}>{backfillBar}{renderFlow()}</View> : renderFlow();
+  if (flow) {
+    const panel = flow.kind === 'ft' && flow.foulTrip && foulCardEl ? <View style={{ gap: theme.spacing(3) }}>{foulCardEl}{renderFlow()}</View> : renderFlow();
+    return backfillBar ? <View style={{ gap: theme.spacing(3) }}>{backfillBar}{panel}</View> : panel;
+  }
 
   // SD-57: timeouts left in the current window (FIBA 2 / 3 / 1 per OT, NBA,
   // or a per-game count; null = not tracked), at the moment the play is stamped.
@@ -777,25 +827,34 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
         const fbOn = state.trackFastBreak === true;
         const andOne = zones;
         if (!mates.length && !fbOn && !andOne) return null;
-        const whose = assistFor.scorer ? `${assistFor.scorer.fullName}'s` : 'the';
+        const who = assistFor.scorer ? assistFor.scorer.fullName : teamOf(assistFor.side);
+        // describe-us (US-DON-3): the shared card — the detail read from the log,
+        // each tap saved at once on THIS basket (by its id, DU8), Done / Skip under it
+        const ref = assistFor.ref;
+        const got = ref != null ? assistCard(state, ref) : { assist: undefined, fb: false };
+        const key = `b${assistFor.fromSeq}`;
+        const summary = [got.assist && `Assist: ${pName(got.assist.pid, got.assist.playerName)}`, got.fb && 'Fast break'].filter(Boolean).join(' · ');
+        // DU13: one assist per basket — a re-tap clears it, another player replaces it
+        const pickAssist = (p: Player) => {
+          if (ref == null) return;
+          if (got.assist) dispatch(removal(got.assist));
+          if (got.assist?.pid !== p.id) dispatch(stamped(statAction(assistFor.side, 'ASSIST', p, ref)));
+        };
+        const toggleFb = () => { if (ref != null) dispatch(tagAction(assistFor.side, ref, !got.fb)); };
         return (
-          <View style={ctrl.assistBox}>
-            <View style={ctrl.editHead}>
-              <Text style={[ctrl.label, ctrl.flex]} numberOfLines={2}>{mates.length ? `🅰️ Assist on ${whose} +${assistFor.points}?` : `🏀 ${whose.replace(/^the$/, 'The')} +${assistFor.points}`}</Text>
-              <Button label={mates.length ? 'Skip' : 'Done'} variant="ghost" onPress={() => setAssistFor(null)} />
-            </View>
+          <DescribeCard title={`Last basket · ${who} +${assistFor.points}${mates.length ? ' — assist?' : ''}`}
+            summary={summary} mode={marks.modeOf(key)} onDone={() => marks.mark(key, 'done')} onSkip={() => marks.mark(key, 'skipped')} onEdit={() => marks.mark(key, null)}>
             {mates.length > 0 && (
               <View style={ctrl.chips}>
                 {mates.map((p) => (
-                  <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => fire(statAction(assistFor.side, 'ASSIST', p, assistFor.ref))} />
+                  <SelectChip key={p.id} label={p.fullName} accessibilityLabel={`Assist: ${p.fullName}`} active={got.assist?.pid === p.id} disabled={ref == null} onPress={() => pickAssist(p)} />
                 ))}
               </View>
             )}
             {(fbOn || andOne) && (
               <View style={ctrl.chips}>
                 {fbOn && (
-                  <SelectChip label="⚡ Fast break" accessibilityLabel="Fast break: tag this basket" active={assistFor.fb === true}
-                    onPress={() => { dispatch({ type: 'TAG', side: assistFor.side, payload: { fb: !assistFor.fb } }); setAssistFor({ ...assistFor, fb: !assistFor.fb }); }} />
+                  <SelectChip label="⚡ Fast break" accessibilityLabel="Fast break: tag this basket" active={got.fb} disabled={ref == null} onPress={toggleFb} />
                 )}
                 {andOne && (
                   <SelectChip label="🔗 And-one" accessibilityLabel="And-one: log the bonus free throw" active={false}
@@ -803,7 +862,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
                 )}
               </View>
             )}
-          </View>
+          </DescribeCard>
         );
       })()}
 
@@ -849,21 +908,38 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
         </View>
       )}
       {/* US batch 5: "Whose shot?" after a block — names the shooter (the missed shot already counts) */}
-      {blockFor && blockFor.ref != null && (
-        <View style={ctrl.assistBox}>
-          <View style={ctrl.editHead}>
-            <Text style={[ctrl.label, ctrl.flex]}>🛡️ Block — whose shot? ({teamOf(opp(blockFor.side))})</Text>
-            <Button label="Skip" variant="ghost" onPress={() => setBlockFor(null)} />
-          </View>
-          <View style={ctrl.chips}>
-            {!halfCourt && <SelectChip label="3-pt try" active={blockFor.three === true} onPress={() => setBlockFor({ ...blockFor, three: !blockFor.three })} />}
-            {courtOf(opp(blockFor.side)).filter((p) => !fouledOut(p)).map((p) => (
-              <SelectChip key={p.id} label={p.fullName} active={false}
-                onPress={() => fire(missAction(opp(blockFor.side), blockFor.three ? 3 : halfCourt ? 1 : 2, p, undefined, blockFor.ref))} />
-            ))}
-          </View>
-        </View>
-      )}
+      {/* describe-us (US-DON-5): the shared card; a re-tap clears, another shooter (or the 3-pt toggle) replaces it */}
+      {blockFor && blockFor.ref != null && (() => {
+        const ref = blockFor.ref;
+        const { block, shot } = blockCard(state, ref);
+        if (!block) return null;
+        const shooterSide = opp(blockFor.side);
+        const key = `k${blockFor.fromSeq}`;
+        const three = blockFor.three === true;
+        const pts = (t: boolean) => (t ? 3 : halfCourt ? 1 : 2);
+        const logShot = (p: { id: string }, t: boolean) => dispatch(stamped(missAction(shooterSide, pts(t), p, undefined, ref)));
+        const pickShooter = (p: Player) => {
+          if (shot) dispatch(removal(shot));
+          if (shot?.pid !== p.id) logShot(p, three);
+        };
+        const toggleThree = () => {
+          setBlockFor({ ...blockFor, three: !three });
+          if (shot?.pid) { dispatch(removal(shot)); logShot({ id: shot.pid }, !three); }
+        };
+        const summary = shot ? `Shot by ${pName(shot.pid, shot.playerName)}${shot.points === 3 ? ' (3-pt try)' : ''}` : '';
+        return (
+          <DescribeCard title={`Last block · ${pName(block.pid, block.playerName)} — whose shot? (${teamOf(shooterSide)})`}
+            summary={summary} mode={marks.modeOf(key)} onDone={() => marks.mark(key, 'done')} onSkip={() => marks.mark(key, 'skipped')} onEdit={() => marks.mark(key, null)}>
+            <View style={ctrl.chips}>
+              {!halfCourt && <SelectChip label="3-pt try" active={three} onPress={toggleThree} />}
+              {courtOf(shooterSide).filter((p) => !fouledOut(p)).map((p) => (
+                <SelectChip key={p.id} label={p.fullName} accessibilityLabel={`Shot by ${p.fullName}`} active={shot?.pid === p.id} onPress={() => pickShooter(p)} />
+              ))}
+            </View>
+          </DescribeCard>
+        );
+      })()}
+      {foulCardEl}
 
       {/* Free throws — always available: shooting foul, and-one, technical, bonus. */}
       <View style={ctrl.row}>

@@ -385,7 +385,8 @@ describe('deep wave · scorer UI guards', () => {
   test('zone buttons log one SCORE / MISS with the zone; the fast-break chip dispatches TAG; fouls drawn ride on the FOUL', () => {
     assert.match(src, /score\(side, zoneValue\(b\.zone\), selected, tracking, \{ zone: b\.zone \}\)/);
     assert.match(src, /miss\(side, zoneValue\(b\.zone\), selected, b\.zone\)/);
-    assert.match(src, /dispatch\(\{ type: 'TAG', side: assistFor\.side, payload: \{ fb: !assistFor\.fb \} \}\)/);
+    // describe-us DU8: the ⚡ chip tags its own basket by id (tagAction), never "the side's latest"
+    assert.match(src, /dispatch\(tagAction\(assistFor\.side, ref, !got\.fb\)\)/);
     assert.match(src, /const drawn = state\.trackFoulsDrawn \? \{ fdt: true, drawnBy \} : \{\};\s*fire\(foulAction\(side, fouler, type, \{ \.\.\.drawn, \.\.\.\(cat2 \? \{ cat2: true \} : \{\}\) \}\)\)/);
     assert.doesNotMatch(src, /drawn: drawnBy\.fullName/, 'IDs-only: who drew it by id, never the name');
   });

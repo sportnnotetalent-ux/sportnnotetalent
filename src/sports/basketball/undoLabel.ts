@@ -12,6 +12,8 @@ const QUIET: Record<string, string> = {
   KICKOFF: 'tip-off', CLOCK: 'clock start / stop', SET_CLOCK: 'clock set', NEXT_QUARTER: 'end of the period',
   START_OVERTIME: 'start of overtime', SET_LINEUP: 'starting five', TAG: 'fast-break tag', END: 'full time',
   REMOVE_EVENT: 'timeline correction',
+  // describe-us DU16: the detail attached after the foul
+  FOUL_DRAWN: 'who drew the foul',
 };
 
 const who = (nameOf: NameOf, id?: string, legacy?: string) => (id || legacy?.trim() ? nameOf(id, legacy) : '');

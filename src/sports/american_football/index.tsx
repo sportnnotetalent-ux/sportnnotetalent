@@ -57,6 +57,8 @@ import { afVoice, afVoiceEnds, lastPasser } from './voice';
 import { AMERICAN_FOOTBALL_META } from './meta';
 import { afMatchRecords } from './records';
 import { MainAction } from '../MainAction';
+import { DescribeCard, useDescribeMarks } from '../../components/DescribeCard';
+import { afCardDetail, afCardFor, afCardStale, targetAction, type AfCard } from './describe';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const who = (p?: Player | null): Who | undefined => (p ? { id: p.id } : undefined); // IDs-only scoring: the id, never the name
@@ -106,17 +108,15 @@ type Flow =
   | { mode: 'fg'; side: Side; step: 'result' | 'kicker' | 'blocker'; yards: string; good?: boolean; blocked?: boolean; kicker?: Player | null }
   | { mode: 'safety'; side: Side }
   | { mode: 'eject'; side: Side }
-  | { mode: 'tackle'; side: Side; loss?: boolean }
   | { mode: 'run'; side: Side; step: 'who' | 'yards'; p1?: Player | null }
   | { mode: 'pass'; side: Side; step: 'passer' | 'receiver' | 'yards'; p1?: Who; p2?: Player | null }
-  | { mode: 'inc'; side: Side; step: 'passer' | 'target'; p1?: Who }
-  | { mode: 'pd'; side: Side }
+  // describe-us DU1: the passer only (when unknown) — the play is then logged; its target comes after
+  | { mode: 'inc'; side: Side; step: 'passer' }
   | { mode: 'sack'; side: Side; step: 'who' | 'yards'; p2?: Player | null }
   | { mode: 'int'; side: Side; step: 'who' | 'spot'; p2?: Player | null; ret?: number }
   | { mode: 'fumble'; side: Side; step: 'who' | 'rec' | 'spot' | 'keptBy' | 'keptYds'; p1?: Player | null; p2?: Player | null }
   | { mode: 'punt'; side: Side; step: 'who' | 'yards' | 'ret' | 'blocker'; p1?: Player | null; gross?: number; returner?: Player | null }
-  // US batch 6: who forced a fumble (optional); a flag thrown on a play — the foul, then how it was settled
-  | { mode: 'ff'; side: Side }
+  // US batch 6: a flag thrown on a play — the foul, then how it was settled
   | { mode: 'penOn'; side: Side; inp: PlayInput; step: 'foul' | 'enf'; foul?: Foul; by?: Player | null }
   | { mode: 'penalty'; side: Side; step: 'foul' | 'yards'; foul?: Foul }
   | { mode: 'drive' }
@@ -138,6 +138,16 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
   const [setting, setSetting] = useState(false);
   // US batch 6: "Flag on the play" — the next scrimmage play asks for its penalty
   const [flagOn, setFlagOn] = useState(false);
+  // describe-us: the last play's optional detail — one card under the pads,
+  // Done / Skip per play (its id), closed once a newer play is logged (DU9);
+  // `seen` = its play has reached the log (a play on its way doesn't close it)
+  const [desc, setDesc] = useState<{ ref: string; side: Side; card: AfCard; seen?: boolean } | null>(null);
+  const descMarks = useDescribeMarks<string>();
+  useEffect(() => {
+    if (!desc) return;
+    if (!desc.seen) { if (s.events.some((e) => e.id === desc.ref)) setDesc({ ...desc, seen: true }); return; }
+    if (afCardStale(s, desc.ref)) setDesc(null);
+  }, [s.events, desc]); // eslint-disable-line react-hooks/exhaustive-deps
   const [driveIn, setDriveIn] = useState<{ off: Side; spot: string; down: number; toGo: string }>({ off: 'home', spot: '25', down: 1, toGo: '10' });
   const [, tick] = useState(0);
   useEffect(() => {
@@ -211,21 +221,21 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
     // deep wave: a completion recorded with "Targets" on credits its receiver a target
     const a = buildPlay(s, sd, { ...inp, ...(s.trackTargets && (inp.play === 'pass' || (inp.play === 'inc' && inp.p2)) ? { tgt: true } : {}) }, stamp());
     dispatch(a);
-    // US batch 6: a play wiped out by a penalty asks nothing more
-    if (inp.pen && (inp.pen.enf === 'prev' || inp.pen.enf === 'off')) setFlow(null);
-    // deep wave: who broke up an incomplete pass (optional), when tracked
-    else if (s.trackDefence && a.type === 'PLAY' && inp.play === 'inc') setFlow({ mode: 'pd', side: other(sd) });
-    // US batch 6: who forced a fumble (optional), with defensive detail on
-    else if (s.trackDefence && a.type === 'PLAY' && inp.play === 'fumble') setFlow({ mode: 'ff', side: other(sd) });
-    // a tackle / flag pull after a gain, when tracked (a loss = a tackle for loss with defensive detail on)
-    else if (s.trackTackles && a.type === 'PLAY' && (inp.play === 'run' || inp.play === 'pass')) setFlow({ mode: 'tackle', side: other(sd), loss: !!s.trackDefence && (inp.yards ?? 0) < 0 });
-    else setFlow(null);
+    setFlow(null);
+    // describe-us DU1 / DU2: the play is on the board; what the scorer may add
+    // (the intended receiver, who broke it up, forced the fumble, made the
+    // tackle — a loss = a tackle for loss with defensive detail on) is one
+    // optional card under the pads, never a step before the next play. A play
+    // wiped out by a penalty, or a score, asks nothing (afCardFor).
+    const card = editAt ? null : afCardFor(s, inp, a);
+    const ref = typeof a.payload?.uid === 'string' ? a.payload.uid : undefined;
+    setDesc(card && ref ? { ref, side: sd, card } : null);
   };
-  /** ✗ Incomplete: one tap with a known passer; the intended receiver is an optional step with "Targets" on. */
+  /** ✗ Incomplete: one tap with a known passer (else the passer first); the
+   *  intended receiver is optional, on the card after the play (DU1). */
   const incomplete = (sd: Side) => {
     const qb = lastPasser(s, sd);
-    if (s.trackTargets) setFlow({ mode: 'inc', side: sd, step: qb ? 'target' : 'passer', p1: qb });
-    else if (qb) play(sd, { play: 'inc', p1: qb });
+    if (qb) play(sd, { play: 'inc', p1: qb });
     else setFlow({ mode: 'inc', side: sd, step: 'passer' });
   };
 
@@ -381,41 +391,13 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
           </View>
         );
       }
-      case 'tackle': {
-        const sd = flow.side;
-        const loss = !!flow.loss;
-        return (
-          <View style={c.panel}>{head(flag ? (loss ? 'Flag pulled for a loss by' : 'Flag pulled by') : loss ? 'Tackle for loss by' : 'Tackle by', sd)}
-            <PlayerGrid players={players(sd)} onPick={(p) => {
-              dispatch({ type: 'TACKLE', side: sd, payload: { ...stamp(), ...(loss ? { tfl: true } : {}) }, ...credit({ type: 'tackle', tfl: loss || undefined, playerId: p.id }) });
-              setFlow(null);
-            }} skip={{ label: 'Skip', onPress: () => setFlow(null) }} />
-          </View>
-        );
-      }
-      case 'pd': {
-        // deep wave: who broke up the incomplete pass (passes defended) — optional
-        const sd = flow.side;
-        return (
-          <View style={c.panel}>{head('Pass broken up by', sd)}
-            <PlayerGrid players={players(sd)} onPick={(p) => { dispatch({ type: 'PASS_DEF', side: sd, payload: stamp(), ...credit({ type: 'pd', playerId: p.id }) }); setFlow(null); }}
-              skip={{ label: 'Nobody / skip', onPress: () => setFlow(null) }} />
-          </View>
-        );
-      }
       case 'inc': {
+        // describe-us DU1: the passer, then the play is logged — the target is on the card after
         const sd = flow.side;
-        if (flow.step === 'passer') return (
-          <View style={c.panel}>{head('Pass incomplete — passer', sd)}
-            <PlayerGrid players={players(sd)} onPick={(p) => (s.trackTargets ? setFlow({ ...flow, p1: who(p), step: 'target' }) : play(sd, { play: 'inc', p1: who(p) }))}
-              skip={{ label: 'Skip passer', onPress: () => (s.trackTargets ? setFlow({ ...flow, p1: undefined, step: 'target' }) : play(sd, { play: 'inc' })) }} />
-          </View>
-        );
         return (
-          <View style={c.panel}>{head('Pass incomplete — intended for', sd)}
-            <Text style={c.meta}>Passer: {flow.p1?.name ?? '—'} · <Text style={c.linkInline} accessibilityRole="button" onPress={() => setFlow({ ...flow, step: 'passer' })}>change</Text></Text>
-            <PlayerGrid players={players(sd).filter((p) => p.id !== flow.p1?.id)} onPick={(p) => play(sd, { play: 'inc', p1: flow.p1, p2: who(p) })}
-              skip={{ label: 'No target / skip', onPress: () => play(sd, { play: 'inc', p1: flow.p1 }) }} />
+          <View style={c.panel}>{head('Pass incomplete — passer', sd)}
+            <PlayerGrid players={players(sd)} onPick={(p) => play(sd, { play: 'inc', p1: who(p) })}
+              skip={{ label: 'Skip passer', onPress: () => play(sd, { play: 'inc' }) }} />
           </View>
         );
       }
@@ -573,16 +555,6 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
             <Text style={c.meta}>{f.autoFirst ? 'Automatic first down. ' : ''}{f.lossOfDown ? 'Loss of down. ' : ''}Half the distance to the goal at most.</Text>
             <Button variant="primary" label={`Accept · ${f.yards} yards`} color={color(on)} onPress={() => go(f.yards)} />
             <YardsPad chips={[5, 10, 15]} onPick={go} label="Other yardage" />
-          </View>
-        );
-      }
-      case 'ff': {
-        // US batch 6: who forced the fumble (optional)
-        const sd = flow.side;
-        return (
-          <View style={c.panel}>{head('Fumble forced by', sd)}
-            <PlayerGrid players={players(sd)} onPick={(p) => { dispatch({ type: 'FORCED_FUMBLE', side: sd, payload: stamp(), ...credit({ type: 'ff', playerId: p.id }) }); setFlow(null); }}
-              skip={{ label: 'Skip', onPress: () => setFlow(null) }} />
           </View>
         );
       }
@@ -755,6 +727,66 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
     );
   })() : null;
 
+  /* ---- describe-us: the last play's card (target, breakup, forced fumble, tackle) ---- */
+  const descCard = (() => {
+    if (!desc) return null;
+    const det = afCardDetail(s, desc.ref);
+    if (!det.play) return null;
+    const { card, ref } = desc;
+    const off = desc.side;
+    const def = other(off);
+    const nm = (sd: Side, id?: string) => (id ? byId(sd, id)?.fullName ?? 'Player' : '');
+    const tk = flag ? 'Flag pull' : 'Tackle';
+    const tkLabel = card.loss ? `${tk} for loss` : tk;
+    const summary = [
+      det.target && `Target: ${nm(off, det.target)}`,
+      det.pd && `Broken up: ${nm(def, det.pd.playerId)}`,
+      det.ff && `Forced: ${nm(def, det.ff.playerId)}`,
+      det.tackle && `${tkLabel}: ${nm(def, det.tackle.playerId)}`,
+    ].filter(Boolean).join(' · ');
+    // DU13: single choice — a re-tap clears it, another player replaces it (the old credit removed first)
+    const swap = (cur: AFEvent | undefined, p: Player, make: () => ScoreAction) => {
+      if (cur) remove(cur);
+      if (cur?.playerId !== p.id) dispatch(make());
+    };
+    const chips = (sd: Side, active: string | undefined, onPick: (p: Player) => void, skipId?: string) => (
+      <View style={c.grid}>
+        {players(sd).filter((p) => p.id !== skipId).map((p) => (
+          <SelectChip key={p.id} label={p.fullName} active={active === p.id} onPress={() => onPick(p)} />
+        ))}
+      </View>
+    );
+    return (
+      <DescribeCard title={`Last play · ${describeEvent(det.play, s).label}`} summary={summary} mode={descMarks.modeOf(ref)}
+        onDone={() => descMarks.mark(ref, 'done')} onSkip={() => descMarks.mark(ref, 'skipped')} onEdit={() => descMarks.mark(ref, null)}>
+        {card.target ? (
+          <>
+            <Text style={c.small}>Intended for ({name(off)})</Text>
+            {chips(off, det.target, (p) => dispatch(det.target === p.id ? targetAction(off, ref, null, p.id) : targetAction(off, ref, { id: p.id }, det.target)), det.play.playerId)}
+          </>
+        ) : null}
+        {card.pd ? (
+          <>
+            <Text style={c.small}>Pass broken up by ({name(def)})</Text>
+            {chips(def, det.pd?.playerId, (p) => swap(det.pd, p, () => ({ type: 'PASS_DEF', side: def, payload: stamp(), ...credit({ type: 'pd', playerId: p.id }) })))}
+          </>
+        ) : null}
+        {card.ff ? (
+          <>
+            <Text style={c.small}>Fumble forced by ({name(def)})</Text>
+            {chips(def, det.ff?.playerId, (p) => swap(det.ff, p, () => ({ type: 'FORCED_FUMBLE', side: def, payload: stamp(), ...credit({ type: 'ff', playerId: p.id }) })))}
+          </>
+        ) : null}
+        {card.tackle ? (
+          <>
+            <Text style={c.small}>{tkLabel} by ({name(def)})</Text>
+            {chips(def, det.tackle?.playerId, (p) => swap(det.tackle, p, () => ({ type: 'TACKLE', side: def, payload: { ...stamp(), ...(card.loss ? { tfl: true } : {}) }, ...credit({ type: 'tackle', tfl: card.loss || undefined, playerId: p.id }) })))}
+          </>
+        ) : null}
+      </DescribeCard>
+    );
+  })();
+
   const sideCol = (sd: Side) => (
     <View key={sd} style={c.col}>
       <Text style={[c.team, { color: ink(sd) }]} numberOfLines={1}>{name(sd)}</Text>
@@ -836,6 +868,8 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
       {otPanel}
       {flowPanel ?? tryPanel ?? drivePanel}
       {!flowPanel && !tryPanel && !(ot && s.decider === 'flag') ? <View style={c.cols}>{sideCol('home')}{sideCol('away')}</View> : null}
+      {/* describe-us DU2: below the pads, so they never move or hide; any next play closes it */}
+      {!flowPanel && !tryPanel ? descCard : null}
       {!flowPanel ? (
         <View style={c.row}>
           {(['home', 'away'] as const).map((sd) => <Button key={sd} label={`🚫 Ejection · ${name(sd)}`} variant="ghost" style={c.flex} onPress={() => setFlow({ mode: 'eject', side: sd })} />)}

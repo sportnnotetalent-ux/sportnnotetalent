@@ -849,6 +849,22 @@ export const reducer = (s: AFState, a: ScoreAction): AFState => {
       if (!side) return s;
       return push(s, { type: 'pd', side, ...w1 });
     }
+    case 'TARGET': {
+      // describe-us DU1: the intended receiver of an incompletion, attached
+      // AFTER the play went on the board (the optional card) — by the play's
+      // id; `null` clears it. The event ends exactly as a one-step incompletion
+      // naming the receiver (DU7). Only a live incompletion takes it, never the
+      // passer himself (DU4). Pushes no event, so ids and `seq` don't move.
+      const id = a.payload?.id;
+      if (typeof id !== 'string' || !id) return s;
+      const ev = s.events.find((e) => e.id === id);
+      if (!ev || ev.type !== 'play' || ev.play !== 'inc' || ev.nul) return s;
+      const t = a.payload?.target;
+      const { secondId: _i, secondName: _n, tgt: _t, ...rest } = ev;
+      if (t === null) return ev.secondId || ev.secondName || ev.tgt ? { ...s, events: s.events.map((e) => (e === ev ? rest : e)) } : s;
+      if (typeof t !== 'string' || !t || t === ev.playerId) return s;
+      return { ...s, events: s.events.map((e) => (e === ev ? { ...rest, secondId: t, tgt: true } : e)) };
+    }
     case 'EJECT': {
       if (!side) return s;
       return push(s, { type: 'eject', side, ...w1 });

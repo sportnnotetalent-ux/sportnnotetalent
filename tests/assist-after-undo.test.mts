@@ -72,7 +72,9 @@ describe('the screens', () => {
   test('the prompts pass their goal / basket id and close when it is gone', () => {
     assert.match(fb, /assistAction\(side, p, trackedKeys\(\), goalId\)/);
     assert.match(fb, /goalId/);
-    assert.match(bb, /statAction\(assistFor\.side, 'ASSIST', p, assistFor\.ref\)/);
+    // describe-us DU13: the card's assist names its basket (`ref` = assistFor.ref), stamped without closing the card
+    assert.match(bb, /const ref = assistFor\.ref;/);
+    assert.match(bb, /stamped\(statAction\(assistFor\.side, 'ASSIST', p, ref\)\)/);
     assert.match(bb, /assistFor && assistFor\.ref != null && !state\.events\.some\(\(e\) => e\.id === assistFor\.ref\)/);
   });
 });

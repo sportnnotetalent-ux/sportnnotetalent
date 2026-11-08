@@ -691,6 +691,27 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
           ...(isBenchTech(a.payload?.bench) && a.payload?.foulType === 'technical' && !name && !pidIn ? { bench: a.payload.bench } : {}),
         }, quarter))
         : s;
+    case 'FOUL_DRAWN': {
+      // describe-us DU1: who was fouled, attached AFTER the foul went on the
+      // board (the optional card) — by the foul's id; `null` clears it. The
+      // event ends exactly as a one-step foul naming the player (DU7). Only a
+      // player's non-technical foul takes it (DU4), and never a player who is
+      // out (DU11). Pushes no event, so ids and `seq` don't move.
+      const id = a.payload?.id;
+      if (typeof id !== 'number') return s;
+      const ev = s.events.find((e) => e.id === id);
+      if (!ev || ev.type !== 'foul' || ev.foulType === 'technical' || ev.bench) return s;
+      const d = a.payload?.drawnPid;
+      if (d === null) {
+        if (!ev.drawnPid && !ev.drawn) return s;
+        const { drawnPid: _p, drawn: _n, ...rest } = ev;
+        return { ...s, events: s.events.map((e) => (e === ev ? rest : e)) };
+      }
+      if (typeof d !== 'string' || !d) return s;
+      if (isPlayerOut(s, undefined, { side: ev.side === 'home' ? 'away' : 'home', pid: d })) return s;
+      const { drawn: _n, ...rest } = ev;
+      return { ...s, events: s.events.map((e) => (e === ev ? { ...rest, drawnPid: d } : e)) };
+    }
     case 'TIMEOUT':
       return a.side ? whistle(push(s, { minute, type: 'timeout', side: a.side }, quarter), true) : s;
     case 'JUMP_BALL': {

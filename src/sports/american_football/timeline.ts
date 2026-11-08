@@ -110,6 +110,8 @@ export function afUndoLabel(step: { type: string; prev: unknown; next: unknown }
   if (step.type === 'XI') return 'line-up';
   if (step.type === 'SET_DRIVE') return 'ball placement';
   if (step.type === 'OT_FIRST') return 'overtime coin toss';
+  // describe-us DU16: the detail attached after an incompletion
+  if (step.type === 'TARGET') return 'intended receiver';
   if (!prev?.events || !next?.events || next.events.length <= prev.events.length) return null;
   const e = next.events[next.events.length - 1];
   const d = describeEvent(e);
