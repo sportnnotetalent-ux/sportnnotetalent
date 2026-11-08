@@ -100,7 +100,9 @@ test(`${N} new union matches track penalties conceded`, () => {
   for (let i = 0; i < N; i++) {
     const s = unionLog().reduce(rugby.reducer, rugby.init(newMatch(fields, rnd(2) ? 'tournament' : undefined)));
     assert.equal(s.trackPenalties, true);
-    assert.ok(rugby.trackedTallyKeys(s).includes('penaltiesGivenAway'));
+    // no-false-zeros NZI11: offered by default, tracked once a penalty is recorded (none in these logs)
+    assert.equal(rugby.trackedTallyKeys(s).includes('penaltiesGivenAway'), false);
+    assert.ok(rugby.trackedTallyKeys(s, { type: 'tally', side: 'home', tally: 'penalty' }).includes('penaltiesGivenAway'));
     assert.equal(rugby.RUGBY_LIVE_SETTINGS.read(s).trackPenalties, true);
   }
 });
@@ -133,7 +135,9 @@ test(`${N} new league matches track errors & penalties conceded`, () => {
   for (let i = 0; i < N; i++) {
     const s = leagueLog().reduce(league.reducer, league.init(newMatch(fields, rnd(2) ? 'tournament' : undefined)));
     assert.equal(s.trackErrors, true);
-    assert.equal(league.trackedDetailKeys(s).length, 2);
+    // no-false-zeros NZI12: offered by default, tracked per kind once recorded (none in these logs)
+    assert.deepEqual(league.trackedDetailKeys(s), []);
+    assert.deepEqual(league.trackedDetailKeys(s, { type: 'detail', side: 'home', detail: 'penalty' }), ['penaltiesGivenAway']);
     assert.equal(league.LEAGUE_LIVE_SETTINGS.read(s).trackErrors, true);
   }
 });

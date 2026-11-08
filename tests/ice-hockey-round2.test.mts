@@ -13,7 +13,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  init, reducer, eventCredits, creditAttribution, mirrorZone, isFoZone, foZoneKey, zonesTracked, ppOpportunities, teamFigures,
+  init, reducer, eventCredits, creditAttribution, mirrorZone, isFoZone, foZoneKey, zonesTracked, zonesOffered, ppOpportunities, teamFigures,
   FO_ZONES, FO_ZONE_KEYS, TRACK_FIELDS, ICE_HOCKEY_LIVE_SETTINGS,
   type IceHockeyState, type Side, type IceEvent, type FoZone, type PenKind,
 } from '../src/sports/ice_hockey/engine.ts';
@@ -120,10 +120,12 @@ describe('round 2 · the TALLY action carries the zone (faceoffs only)', () => {
     assert.equal('trackFaceoffZones' in init({ trackFaceoffs: true }), false);
     assert.equal(init({ trackFaceoffZones: 'true' }).trackFaceoffZones, true);
   });
-  test('zones are tracked only with Faceoffs (or when a zone was recorded)', () => {
-    assert.equal(zonesTracked(init(ZONES_ON)), true);
-    assert.equal(zonesTracked(init({ trackFaceoffZones: true })), false, 'zones alone (no faceoffs) track nothing');
-    assert.equal(zonesTracked(init({ trackFaceoffs: true })), false);
+  test('zones are offered only with Faceoffs; tracked once a zone was recorded', () => {
+    // no-false-zeros NZI8: switched on = offered (zonesOffered); tracked = a zone recorded
+    assert.equal(zonesTracked(init(ZONES_ON)), false);
+    assert.equal(zonesOffered(init(ZONES_ON)), true);
+    assert.equal(zonesOffered(init({ trackFaceoffZones: true })), false, 'zones alone (no faceoffs) offer nothing');
+    assert.equal(zonesOffered(init({ trackFaceoffs: true })), false);
     assert.equal(zonesTracked(run([fo('home', 0, 1, 'h4', 'a4', 'oz')])), true, 'a recorded zone counts');
   });
 });

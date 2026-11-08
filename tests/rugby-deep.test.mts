@@ -113,8 +113,12 @@ describe('deep wave · old logs replay identically', () => {
   test('an old match that tracked detail keeps exactly its keys (no offloads / turnovers conceded)', () => {
     const det = run([xi('home'), detailA('home', H1(1), 'tackle', 'h7'), detailA('away', H1(2), 'penaltyConceded', 'a3'), pieceA('home', H1(3), 'scrum', true), tryA('home', H1(4), 'h11')], { trackDetail: true });
     const t = rugbyTotals(det);
+    // no-false-zeros NZI11: the detail kinds it recorded (tackle → its missed-tackle pair,
+    // penalty conceded) read on every line; carries / line breaks / turnovers won were never
+    // recorded, so they are absent, not 0
+    const recorded = ['tackles', 'missedTackles', 'penaltiesGivenAway'];
     for (const l of Object.values(t)) {
-      for (const k of DETAIL_STATS) assert.equal(typeof l.stats[k], 'number', k);
+      for (const k of DETAIL_STATS) assert.equal(typeof l.stats[k], recorded.includes(k) ? 'number' : 'undefined', k);
       for (const k of NEW_KEYS) assert.equal(k in l.stats, false, k);
     }
     const cols = buildBoxTable(rugbyStats, rugbyBox(det).data('all'), { scope: 'all' }).columns.map((c) => c.key);
@@ -183,13 +187,17 @@ describe('deep wave · optional tallies (penalties, free kicks, turnovers, 22 en
     assert.equal('tackles' in t.h11.stats, false, 'detail was not tracked');
   });
   test('only the switched-on toggles own their keys', () => {
+    // no-false-zeros NZI11: switched on with none recorded owns nothing (was: offloads 0)
     const s = run(log.filter((a) => a.type !== 'TALLY'), { trackOffloads: true });
     const t = rugbyTotals(s);
-    assert.equal(t.h11.stats.offloads, 0);
+    assert.equal('offloads' in t.h11.stats, false);
     assert.equal('turnoversConceded' in t.h11.stats, false);
     assert.equal('penaltiesGivenAway' in t.h11.stats, false);
-    assert.equal(tallyTracked(s, 'trackOffloads'), true);
+    assert.equal(tallyTracked(s, 'trackOffloads'), false);
     assert.equal(tallyTracked(s, 'trackTurnovers'), false);
+    const s2 = run(log.filter((a) => a.type !== 'TALLY' || a.payload?.kind === 'offload'), { trackOffloads: true });
+    assert.equal(rugbyTotals(s2).h11.stats.offloads, 0, 'one recorded → 0 for the others');
+    assert.equal(tallyTracked(s2, 'trackOffloads'), true);
   });
   test('box: PC, OL, TC columns when tracked; unnamed penalties / turnovers land on the Team row', () => {
     const s = run(log, ALL_ON);
@@ -298,7 +306,8 @@ describe('deep wave · the broadcast stats sheet', () => {
     assert.equal(row(sh, 'setPiece', 'scrumSteals')?.home, '1');
     assert.equal(row(sh, 'defence', 'tackleSuccess')?.home, '3/4 (75%)');
     assert.equal(row(sh, 'defence', 'tackles')?.away, '0', 'tracked: a true 0');
-    assert.equal(row(sh, 'attack', 'carries')?.home, '0');
+    // no-false-zeros NZI11: carries were never recorded → no row (was: '0')
+    assert.equal(row(sh, 'attack', 'carries'), undefined);
   });
   test('scoring rows and points by half on the Overall view only', () => {
     const s = run(MATCH);

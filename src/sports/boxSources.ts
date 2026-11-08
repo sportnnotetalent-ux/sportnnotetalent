@@ -27,9 +27,10 @@ import { detailTally as vbDetailTally, detailTracked as vbDetailTracked } from '
 import { tally as kabaddiTally, isShootoutEvent, type KabaddiState } from './kabaddi/engine.ts';
 import { kabaddiMatchCentre, KABADDI_COUNT_KEYS } from './kabaddi/totals.ts';
 import { footballStats, kickText, type FootballState, type TrackConfig } from './football/engine.ts';
+import type { StatKind } from './football/events.ts';
 import { footballFieldLog, liveClockMinutes } from './football/fieldTime.ts';
 import { keeperTotals, position } from './football/keepers.ts';
-import { footballPossession } from './football/depth.ts';
+import { footballPossession, kindCaptured, TOGGLE_KINDS } from './football/depth.ts';
 import { trackField } from './onField.ts';
 import type { RallyState } from './rallyEngine.ts';
 import type { TennisState } from './tennis/engine.ts';
@@ -451,9 +452,10 @@ export function footballBox(s0: FootballState, ctx: BoxContext = {}): MatchBoxSo
           goals: 0, assists: 0,
           // SD-80: an OG column only when the match (this scope) had an own goal
           ...(anyOg ? { ownGoals: 0 } : null),
-          ...(t?.shots !== false ? { shots: 0, shotsOnTarget: 0 } : null),
-          ...(t?.saves !== false ? { saves: 0 } : null),
-          ...(t?.fouls !== false ? { fouls: 0 } : null),
+          // NZI3 (no false zeros): a column only once that kind was captured
+          ...(t?.shots !== false && kindCaptured(s0, 'shot') ? { shots: 0, shotsOnTarget: 0 } : null),
+          ...(t?.saves !== false && kindCaptured(s0, 'save') ? { saves: 0 } : null),
+          ...(t?.fouls !== false && kindCaptured(s0, 'foul') ? { fouls: 0 } : null),
           ...(t?.cards !== false ? { yellowCards: 0, redCards: 0 } : null),
         });
         // `name` = the shown name (a named state's); the row's key is the player
@@ -518,19 +520,25 @@ export function footballBox(s0: FootballState, ctx: BoxContext = {}): MatchBoxSo
         const listed = new Set([...rows.values()].map((r) => r.playerId).filter(Boolean));
         for (const p of roster) if (!rows.has(p.id) && !listed.has(p.id)) rows.set(p.id, { name: ctx.nameOf ? ctx.nameOf(p.id, p.fullName) : p.fullName, playerId: p.id, stats: {}, dnp: true });
         const tt = totals[sd];
+        const teamStats: Record<string, number> = {
+          shots: tt.shots, shotsOnTarget: tt.shotsOnTarget, blockedShots: tt.blockedShots,
+          // possession only when the bar was used and the ball changed hands — the
+          // kick-off alone hands one side a false "100% – 0%" (deep wave, 2026-10-22)
+          ...(realPossession ? { possession: possession[sd] } : {}),
+          passes: tt.passes, passAccuracy: passAcc[sd], fouls: tt.fouls, yellowCards: tt.yellow, redCards: tt.red,
+          offsides: tt.offsides, corners: tt.corners, tackles: tt.tackles, interceptions: tt.interceptions, saves: tt.saves,
+          crosses: tt.crosses, dribbles: tt.dribbles, handballs: tt.handballs,
+          attackingContributions: tt.attackContributions, defensiveContributions: tt.defenceContributions,
+        };
+        // NZI4 (no false zeros): a switched-on stat with nothing captured has no
+        // row (an off one is listed "not tracked" via `untracked`)
+        for (const [k, kinds] of Object.entries(TOGGLE_KINDS) as [keyof TrackConfig, StatKind[]][]) {
+          if (!kindCaptured(s0, ...kinds)) for (const key of FOOTBALL_TRACK_KEYS[k]) delete teamStats[key];
+        }
         return {
           // SD-56: the shirt number, where the squad has one
           rows: [...rows.values()].map((r) => numberedRow(withId(r, roster), roster)),
-          teamStats: {
-            shots: tt.shots, shotsOnTarget: tt.shotsOnTarget, blockedShots: tt.blockedShots,
-            // possession only when the bar was used and the ball changed hands — the
-            // kick-off alone hands one side a false "100% – 0%" (deep wave, 2026-10-22)
-            ...(realPossession ? { possession: possession[sd] } : {}),
-            passes: tt.passes, passAccuracy: passAcc[sd], fouls: tt.fouls, yellowCards: tt.yellow, redCards: tt.red,
-            offsides: tt.offsides, corners: tt.corners, tackles: tt.tackles, interceptions: tt.interceptions, saves: tt.saves,
-            crosses: tt.crosses, dribbles: tt.dribbles, handballs: tt.handballs,
-            attackingContributions: tt.attackContributions, defensiveContributions: tt.defenceContributions,
-          },
+          teamStats,
         };
       };
       return { home: side('home'), away: side('away'), untracked };

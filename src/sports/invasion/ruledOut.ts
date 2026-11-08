@@ -65,9 +65,11 @@ export const ruledOutAction = (sport: RuledOutSport, side: Side, o: { reason?: s
 /** Is the toggle on in this config (state keys only when on)? */
 export const ruledOutConfig = (config?: Record<string, unknown>): { trackRuledOut?: true } => (config?.trackRuledOut === true ? { trackRuledOut: true } : {});
 
-/** Tracked in the match: the toggle, or any logged (a match that switched it off keeps what it logged). */
-export const ruledOutTracked = (flag: boolean | undefined, events: readonly { type: string }[]): boolean =>
-  flag === true || events.some((e) => e.type === 'ruledout');
+/** Tracked in the match: any logged (a match that switched it off keeps what
+ *  it logged). NZI13 (no false zeros): the toggle only offers the button —
+ *  switched on with none logged is no "Tries ruled out 0 v 0". */
+export const ruledOutTracked = (_flag: boolean | undefined, events: readonly { type: string }[]): boolean =>
+  events.some((e) => e.type === 'ruledout');
 
 /** Timeline row words. */
 export function ruledOutRow(sport: RuledOutSport, e: { reason?: string; review?: boolean }): { icon: string; label: string; detail?: string } {

@@ -19,7 +19,7 @@
  * credits from `eventCredits`, zero-filled only when the match tracked zones.
  */
 import {
-  eventCredits, isComplete, matchSec, result, tallyTracked, zonesTracked, FLAG_KEYS, FO_ZONE_KEYS, LIVE_KEYS, TALLY_KEYS, TRACK_FLAGS,
+  eventCredits, iceTrackedKeys, isComplete, matchSec, result, FO_ZONE_KEYS, LIVE_KEYS, TALLY_KEYS,
   type IceHockeyState, type Side, type Who,
 } from './engine.ts';
 
@@ -146,7 +146,8 @@ export function iceHockeyTotals(s: IceHockeyState): Record<string, Line> {
   }
   // deep wave: a tracked tally reads 0 for everyone with a line (untracked: absent, never a false 0);
   // round 2: the per-zone faceoff keys likewise, only when the match tracked zones
-  const tracked = [...TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f]), ...(zonesTracked(s) ? FO_ZONE_KEYS : [])];
+  // NZI8 (no false zeros): per kind, once one was recorded — switched on alone writes nothing
+  const tracked = iceTrackedKeys(s);
   for (const l of Object.values(out)) {
     for (const k of ['goals', 'assists', 'points', 'shotsOnGoal', 'penaltyMinutes'] as const) l.stats[k] ??= 0;
     for (const k of tracked) l.stats[k] ??= 0;

@@ -916,13 +916,37 @@ export function standingsUnits(s: IceHockeyState): { overtime?: boolean; decided
 
 /* --------------------------- live settings (#14) --------------------------- */
 
-/** Is this tally tracked in the match — its toggle on, or any recorded? */
+// NZI8 (no false zeros, docs/security/breaks/no-false-zeros-invasion.md): a
+// tally counts as tracked only once one was recorded. The toggle means
+// "offered" (the chips, voice: `tallyOffered`); switched on with nothing
+// recorded writes no key, no column, no row.
+
+/** Is this tally kind tracked in the match — at least one recorded? */
+export const tallyKindTracked = (s: Pick<IceHockeyState, 'events'>, k: TallyKind): boolean =>
+  s.events.some((e) => e.type === 'tally' && e.tally === k);
+/** Is this "Stats to track" item tracked — any of its tallies recorded? */
 export const tallyTracked = (s: Pick<IceHockeyState, TrackFlag | 'events'>, f: TrackFlag): boolean =>
-  s[f] === true || s.events.some((e) => e.type === 'tally' && !!e.tally && TRACK_KINDS[f].includes(e.tally));
-/** Round 2 — are faceoff zones tracked: the toggle on with Faceoffs tracked,
- *  or any faceoff recorded with its zone? (Never on an old match.) */
+  TRACK_KINDS[f].some((k) => tallyKindTracked(s, k));
+/** NZI9 — is this tally offered to the scorer: its toggle on, or any recorded? */
+export const tallyOffered = (s: Pick<IceHockeyState, TrackFlag | 'events'>, f: TrackFlag): boolean =>
+  s[f] === true || tallyTracked(s, f);
+/** Round 2 — are faceoff zones tracked: any faceoff recorded with its zone?
+ *  (Never on an old match.) */
 export const zonesTracked = (s: Pick<IceHockeyState, TrackFlag | 'trackFaceoffZones' | 'events'>): boolean =>
-  (s.trackFaceoffZones === true && tallyTracked(s, 'trackFaceoffs')) || s.events.some((e) => e.type === 'tally' && e.tally === 'faceoff' && isFoZone(e.zone));
+  s.events.some((e) => e.type === 'tally' && e.tally === 'faceoff' && isFoZone(e.zone));
+/** NZI9 — are zones offered: the toggle on with faceoffs offered, or any recorded. */
+export const zonesOffered = (s: Pick<IceHockeyState, TrackFlag | 'trackFaceoffZones' | 'events'>): boolean =>
+  (s.trackFaceoffZones === true && tallyOffered(s, 'trackFaceoffs')) || zonesTracked(s);
+/** The stat-line keys one tally kind owns once recorded (a faceoff: won + lost). */
+export const KIND_KEYS: Record<TallyKind, string[]> = {
+  faceoff: ['faceoffWins', 'faceoffLosses'], hit: ['checks'], block: ['shotBlocks'], giveaway: ['giveaways'], takeaway: ['takeaways'], missed: ['missedShots'],
+};
+/** NZI8/NZI10 — the tally keys (and faceoff-zone keys) the match has tracked,
+ *  per kind; `add` = the event being recorded now, so its own line lists it. */
+export function iceTrackedKeys(s: Pick<IceHockeyState, TrackFlag | 'trackFaceoffZones' | 'events'>, add?: Partial<IceEvent>): string[] {
+  const t = add ? { ...s, events: [...s.events, add as IceEvent] } : s;
+  return [...TALLY_KINDS.filter((k) => tallyKindTracked(t, k)).flatMap((k) => KIND_KEYS[k]), ...(zonesTracked(t) ? FO_ZONE_KEYS : [])];
+}
 
 export const ICE_HOCKEY_LIVE_SETTINGS: LiveSettings<IceHockeyState> = {
   title: '⚙️ Match settings',

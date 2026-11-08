@@ -71,8 +71,9 @@ import { MainAction } from '../MainAction';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const BASE_TRACKED: string[] = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
-/** the keys this match tracks (the base set + the "Stats to track" switched on) */
-const trackedKeys = (s: RugbyState): string[] => [...BASE_TRACKED, ...trackedTallyKeys(s)];
+/** the keys this match tracks (the base set + the "Stats to track" recorded);
+ *  NZI10/NZI11 (no false zeros): `add` = the event being recorded now */
+const trackedKeys = (s: RugbyState, add?: Parameters<typeof eventCredits>[0]): string[] => [...BASE_TRACKED, ...trackedTallyKeys(s, add)];
 /** deep wave: the per-side chips of the "Stats to track" */
 const TALLY_CHIP: Record<TallyKind, string> = {
   penalty: '⚖ Penalty conceded', freeKick: '🏳 Free kick conceded', turnover: '🔄 Turnover conceded', entry: '⏩ 22 entry', offload: '🤲 Offload',
@@ -202,14 +203,15 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
   const TRACKED = trackedKeys(s);
   const credit = (e: Parameters<typeof eventCredits>[0]) => {
     const cr = eventCredits(e);
-    return { attribution: creditAttribution(cr.first, 1, TRACKED), attribution2: creditAttribution(cr.second, 1, TRACKED) };
+    const tr = trackedKeys(s, e);
+    return { attribution: creditAttribution(cr.first, 1, tr), attribution2: creditAttribution(cr.second, 1, tr) };
   };
   /** deep wave: a "Stats to track" tally (the offence / cause and the player optional) */
   const tally = (sd: Side, kind: TallyKind, p: Player | null, pick?: string) => {
     const why = pick ? (kind === 'penalty' ? { infringement: pick } : kind === 'turnover' ? { cause: pick } : {}) : {};
     // round 2: a free kick says the player was asked (named or "Team"), so the match credits free kicks to players
     const asked = kind === 'freeKick' ? { asked: true } : {};
-    fire({ type: 'TALLY', side: sd, payload: { kind, ...why, ...asked }, ...credit({ type: 'tally', tally: kind, playerId: p?.id }) });
+    fire({ type: 'TALLY', side: sd, payload: { kind, ...why, ...asked }, ...credit({ type: 'tally', tally: kind, playerId: p?.id, ...asked }) });
     setFlow(null);
   };
   /** deep wave: possession / territory switch (a tap on the side already set does nothing — round 2: unless the ball is dead) */

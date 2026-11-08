@@ -54,9 +54,10 @@ describe('round 2 · football "Goal ruled out" behind a toggle', () => {
     assert.equal(LS.read(football.init({ trackRuledOut: true })).trackRuledOut, true);
     assert.ok(football.DEEP_TRACK_FIELDS.some((x) => x.key === 'trackRuledOut'), 'also an organiser format option');
   });
-  test('tracked = the toggle, or any goal ruled out already logged', () => {
+  test('tracked = any goal ruled out logged (the toggle only offers the button)', () => {
     assert.equal(ruledOutTracked(football.init({})), false);
-    assert.equal(ruledOutTracked(football.init({ trackRuledOut: true })), true);
+    // no-false-zeros NZI5: switched on with none logged is not tracked (was: true)
+    assert.equal(ruledOutTracked(football.init({ trackRuledOut: true })), false);
     assert.equal(ruledOutTracked(run([...KICK, noGoal('away')])), true, 'an older match that logged one');
   });
   test('an older match (no toggle) that logged one replays identically and still shows it', () => {
@@ -69,9 +70,13 @@ describe('round 2 · football "Goal ruled out" behind a toggle', () => {
     const attack = centreComparison(footballStats, footballCentreSource(s, { now: 2 }).data('all'), 'all', footballCentre.find((c) => c.id === 'attack')!);
     assert.deepEqual(attack.rows.filter((r) => r.key === 'goalsRuledOut').map((r) => [r.home, r.away]), [['0', '1']]);
   });
-  test('toggle on, none logged: a true 0 v 0; toggle off, none logged: no row', () => {
+  test('none logged: no row, toggle on or off; one logged: 0 v 1', () => {
+    // no-false-zeros NZI5: the toggle on with none logged no longer reads "0 v 0"
     const on = footballDepthTeamStats(run(KICK, { trackRuledOut: true }));
-    assert.deepEqual([on.home.goalsRuledOut, on.away.goalsRuledOut], [0, 0]);
+    assert.equal('goalsRuledOut' in on.home, false);
+    assert.equal('goalsRuledOut' in on.away, false);
+    const one = footballDepthTeamStats(run([...KICK, noGoal('away')], { trackRuledOut: true }));
+    assert.deepEqual([one.home.goalsRuledOut, one.away.goalsRuledOut], [0, 1]);
     const off = footballDepthTeamStats(run(KICK));
     assert.equal('goalsRuledOut' in off.home, false);
     assert.equal('goalsRuledOut' in off.away, false);

@@ -17,7 +17,7 @@
  * Rows exist only for what the match tracked (never a false 0).
  */
 import {
-  matchSec, mirrorZone, penaltyBox, penMinutes, periodLen, periodName, periodOffset, tallyTracked, teamFigures, totalPeriods, zonesTracked,
+  matchSec, mirrorZone, penaltyBox, penMinutes, periodLen, periodName, periodOffset, tallyKindTracked, teamFigures, totalPeriods, zonesTracked,
   FO_ZONES, FO_ZONE_LABEL, type FoZone, type IceEvent, type IceHockeyState, type PenKind, type Side, type TallyKind,
 } from './engine.ts';
 import { countRow, madeRow, rateRow, section, sheet, timeRow, type StatSheet } from '../compareSheet.ts';
@@ -115,8 +115,10 @@ export function iceHockeySheet(s: IceHockeyState, scope: 'all' | number = 'all',
   const H = teamFigures(s, 'home', scope), A = teamFigures(s, 'away', scope);
   const gh = goalsBy(s, 'home', scope), ga = goalsBy(s, 'away', scope);
   const t = (k: TallyKind) => ({ h: tallies(s, 'home', k, scope), a: tallies(s, 'away', k, scope) });
-  const attempts = tallyTracked(s, 'trackAttempts');
-  const physical = tallyTracked(s, 'trackPhysical');
+  // NZI8 (no false zeros): a row per tally kind, only once one was recorded
+  const on = (k: TallyKind) => tallyKindTracked(s, k);
+  const attempts = on('missed');
+  const blocked = on('block');
   const missed = t('missed'), blocks = t('block');
   const zones = zonesTracked(s);
   const zh = faceoffZones(s, 'home', scope), za = faceoffZones(s, 'away', scope);
@@ -139,8 +141,8 @@ export function iceHockeySheet(s: IceHockeyState, scope: 'all' | number = 'all',
       countRow('sog', 'Shots on goal', H.shotsOnGoal, A.shotsOnGoal),
       attempts && countRow('missed', 'Missed shots', missed.h, missed.a),
       // a side's shots the OTHER side blocked
-      physical && countRow('blockedBy', 'Shots blocked', blocks.a, blocks.h),
-      attempts && physical && countRow('attempts', 'Shot attempts', H.shotsOnGoal + missed.h + blocks.a, A.shotsOnGoal + missed.a + blocks.h),
+      blocked && countRow('blockedBy', 'Shots blocked', blocks.a, blocks.h),
+      attempts && blocked && countRow('attempts', 'Shot attempts', H.shotsOnGoal + missed.h + blocks.a, A.shotsOnGoal + missed.a + blocks.h),
       rateRow('shotPct', 'Shooting %', H.goals, H.shotsOnGoal, A.goals, A.shotsOnGoal, { dp: 1 }),
     ]),
     section('pp', 'Power play', [
@@ -159,17 +161,17 @@ export function iceHockeySheet(s: IceHockeyState, scope: 'all' | number = 'all',
       countRow('saves', 'Saves', H.saves, A.saves),
       rateRow('svPct', 'Save %', H.saves, H.saves + gaGk('home'), A.saves, A.saves + gaGk('away'), { dp: 1 }),
     ]),
-    tallyTracked(s, 'trackFaceoffs') && section('fo', 'Faceoffs', [
+    on('faceoff') && section('fo', 'Faceoffs', [
       countRow('fow', 'Faceoffs won', t('faceoff').h, t('faceoff').a),
       rateRow('foPct', 'Faceoff %', t('faceoff').h, t('faceoff').h + t('faceoff').a, t('faceoff').a, t('faceoff').h + t('faceoff').a, { dp: 1 }),
       // round 2: won / taken and % in each zone, each team from its own end (zones tracked only)
       ...(zones ? FO_ZONES.map((z) => madeRow(`fo:${z}`, FO_ZONE_LABEL[z], zh[z].won, zh[z].total, za[z].won, za[z].total, { dp: 1 })) : []),
     ], zones ? 'Zones from each team’s own view: offensive = in the other team’s end.' : undefined),
-    (physical || tallyTracked(s, 'trackPuck')) && section('phys', 'Hits & puck battles', [
-      physical && countRow('hits', 'Hits', t('hit').h, t('hit').a),
-      physical && countRow('blocks', 'Blocked shots', blocks.h, blocks.a),
-      tallyTracked(s, 'trackPuck') && countRow('takeaways', 'Takeaways', t('takeaway').h, t('takeaway').a),
-      tallyTracked(s, 'trackPuck') && countRow('giveaways', 'Giveaways', t('giveaway').h, t('giveaway').a, { lowerBetter: true }),
+    (on('hit') || blocked || on('takeaway') || on('giveaway')) && section('phys', 'Hits & puck battles', [
+      on('hit') && countRow('hits', 'Hits', t('hit').h, t('hit').a),
+      blocked && countRow('blocks', 'Blocked shots', blocks.h, blocks.a),
+      on('takeaway') && countRow('takeaways', 'Takeaways', t('takeaway').h, t('takeaway').a),
+      on('giveaway') && countRow('giveaways', 'Giveaways', t('giveaway').h, t('giveaway').a, { lowerBetter: true }),
     ]),
     scope === 'all' && n >= 2 && section('byPeriod', 'Shots on goal by period',
       Array.from({ length: n }, (_, i) => countRow(`sog${i + 1}`, periodName(s, i + 1), sog('home', i + 1), sog('away', i + 1)))),

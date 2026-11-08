@@ -26,9 +26,9 @@
  * inside the 22).
  */
 import {
-  ballTime, deadSpans, detailTracked, matchSec, penaltiesTracked, periodLong, playedOffset, pointsOf, tallyTracked, teamFigures, totalPeriods,
+  ballTime, deadSpans, detailKindsTracked, matchSec, penaltiesTracked, periodLong, playedOffset, pointsOf, tallyTracked, teamFigures, totalPeriods,
   CAUSE_LABEL, INFRINGEMENTS, INFRINGEMENT_LABEL, TURNOVER_CAUSES, minuteText,
-  type RugbyEvent, type RugbyState, type Side,
+  type DetailKey, type RugbyEvent, type RugbyState, type Side,
 } from './engine.ts';
 import { countRow, decRow, madeRow, section, shareRow, sheet, timeRow, type StatSheet } from '../compareSheet.ts';
 import { ruledOutTracked } from '../invasion/ruledOut.ts';
@@ -111,8 +111,11 @@ const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec 
 /** The sheet for a scope ('all' or a period). `nowSec` = the live playing second. */
 export function rugbySheet(s: RugbyState, scope: 'all' | number = 'all', nowSec?: number): StatSheet {
   const H = teamFigures(s, 'home', scope), A = teamFigures(s, 'away', scope);
-  const detail = detailTracked(s);
-  const sets = detail || s.events.some((e) => e.type === 'setpiece');
+  // NZI11 (no false zeros): a row per detail kind, once one was recorded; set
+  // pieces once one was logged (a tackle alone gives no "Lineouts won 0/0")
+  const kinds = detailKindsTracked(s);
+  const has = (k: DetailKey) => kinds.includes(k);
+  const sets = s.events.some((e) => e.type === 'setpiece');
   const dt = (k: string) => ({ h: H.detail[k] ?? 0, a: A.detail[k] ?? 0 });
   const tk = dt('tackles'), mt = dt('missedTackles');
   const entriesOn = tallyTracked(s, 'trackEntries');
@@ -147,19 +150,19 @@ export function rugbySheet(s: RugbyState, scope: 'all' | number = 'all', nowSec?
     // invasion batch 6: penalty options & 50:22 (only a match that tracked them)
     restartSection('rugby', s, scope),
     section('attack', 'Attack', [
-      detail && countRow('carries', 'Carries', dt('carries').h, dt('carries').a),
-      detail && countRow('lineBreaks', 'Line breaks', dt('lineBreaks').h, dt('lineBreaks').a),
+      has('carry') && countRow('carries', 'Carries', dt('carries').h, dt('carries').a),
+      has('lineBreak') && countRow('lineBreaks', 'Line breaks', dt('lineBreaks').h, dt('lineBreaks').a),
       tallyTracked(s, 'trackOffloads') && countRow('offloads', 'Offloads', H.tally.offload, A.tally.offload),
       ent && countRow('entries', '22 entries', ent.home.entries, ent.away.entries),
       ent && (ent.home.entries || ent.away.entries) && decRow('pointsPerEntry', 'Points per 22 entry',
         ent.home.entries ? ent.home.points / ent.home.entries : undefined, ent.away.entries ? ent.away.points / ent.away.entries : undefined, 1),
       ent && (ent.home.entries || ent.away.entries) && countRow('scoringEntries', '22 entries with points', ent.home.scoring, ent.away.scoring),
     ], ent ? 'Points per 22 entry: points scored after entering the 22, until the next entry or the end of the half (a try with no entry tapped counts as one).' : undefined),
-    detail && section('defence', 'Defence', [
-      countRow('tackles', 'Tackles made', tk.h, tk.a),
-      countRow('missedTackles', 'Missed tackles', mt.h, mt.a, { lowerBetter: true }),
-      madeRow('tackleSuccess', 'Tackle success', tk.h, tk.h + mt.h, tk.a, tk.a + mt.a),
-      countRow('turnoversWon', 'Turnovers won', dt('turnoversWon').h, dt('turnoversWon').a),
+    (has('tackle') || has('turnoverWon')) && section('defence', 'Defence', [
+      has('tackle') && countRow('tackles', 'Tackles made', tk.h, tk.a),
+      has('tackle') && countRow('missedTackles', 'Missed tackles', mt.h, mt.a, { lowerBetter: true }),
+      has('tackle') && madeRow('tackleSuccess', 'Tackle success', tk.h, tk.h + mt.h, tk.a, tk.a + mt.a),
+      has('turnoverWon') && countRow('turnoversWon', 'Turnovers won', dt('turnoversWon').h, dt('turnoversWon').a),
     ]),
     sets && section('setPiece', 'Set piece', [
       madeRow('lineouts', 'Lineouts won (own throw)', H.lineoutsWon, H.lineoutsWon + H.lineoutsLost, A.lineoutsWon, A.lineoutsWon + A.lineoutsLost),

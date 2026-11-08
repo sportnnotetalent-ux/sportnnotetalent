@@ -28,6 +28,7 @@ import {
   stoppageAction, stoppageReasonAction, penaltyConcededActions, penaltyStepAfter, footballTrackedKeys, STOPPAGE_REASONS, STOPPAGE_LABEL,
   goalDetailAction, concussionLeft, GOAL_SITUATIONS, SITUATION_LABEL,
 } from './actions';
+import { footballCapturedKeys } from './depth';
 import { Button, TextField, SelectChip } from '../../components/ui';
 import { askConfirm, confirmMatchAction } from '../../components/ConfirmSheet';
 import { Pitch } from './Pitch';
@@ -267,7 +268,9 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   // stat line so a profile can show "this total spans N of M games".
   // Invasion batch 5: every captured stat (crosses, dribbles, offsides,
   // handballs, penalties won / missed too) — see actions.ts.
-  const trackedKeys = (): string[] => footballTrackedKeys(t, deep);
+  // NZI1 (no false zeros): only the keys of a kind already captured, plus the
+  // kind(s) being recorded now — switched on with nothing tapped stamps nothing.
+  const trackedKeys = (adding: StatKind[] = []): string[] => footballCapturedKeys(footballTrackedKeys(t, deep), state, adding);
 
   // IDs-only scoring: every action is built by ./actions.ts (ids only)
 
@@ -305,7 +308,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   // in `detail` (the payload); none of them credits a player live — statTotals
   // derives the shot-detail keys at completion.
   const recordStat = (kind: StatKind, side: 'home' | 'away', player?: Player, detail?: StatDetail) => {
-    fire(statAction(kind, side, player, detail, { possSide: handover(kind, side), at: Date.now(), tracked: trackedKeys() }));
+    fire(statAction(kind, side, player, detail, { possSide: handover(kind, side), at: Date.now(), tracked: trackedKeys([kind]) }));
     setFlow(null);
   };
   // Deep wave: a shot with the picked detail chips; with key passes tracked,
@@ -470,7 +473,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
       setAfAlert(n > FUTSAL_FOUL_LIMIT ? { side, n, half: state.half } : null);
     }
     // IDs-only scoring: the fouled player by id (`secondId`)
-    fire(foulAction(side, fouler, victim, { at: Date.now(), tracked: trackedKeys() }));
+    fire(foulAction(side, fouler, victim, { at: Date.now(), tracked: trackedKeys(['foul']) }));
     setFlow(t.cards ? { mode: 'foul', step: 'card', side, fouler } : null);
   };
   // MVP F5: a side with no players listed — the foul is the team's (no card step).
@@ -493,7 +496,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
       if (taker) recordGoal(side, taker, 'penalty'); else fire(teamGoalAction(side));
     } else {
       // invasion batch 1: the attempt is a shot too (saved = on target)
-      for (const a of penaltyMissActions(side, outcome, taker, gkOf(opp(side)), { at: Date.now(), tracked: trackedKeys() })) fire(a);
+      for (const a of penaltyMissActions(side, outcome, taker, gkOf(opp(side)), { at: Date.now(), tracked: trackedKeys(['penaltyMissed', 'shot', 'save']) })) fire(a);
     }
     setFlow(null);
   };
@@ -502,7 +505,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   // side's, on target; shooter optional). Re-entering a save from the
   // timeline logs the save only — its shot is still on the log.
   const recordSave = (side: 'home' | 'away', keeper: Player | undefined, shooter: Player | null) => {
-    for (const a of gridSaveActions(side, keeper, shooter, { at: Date.now(), tracked: trackedKeys(), edit: editMin != null })) fire(a);
+    for (const a of gridSaveActions(side, keeper, shooter, { at: Date.now(), tracked: trackedKeys(['save', 'shot']), edit: editMin != null })) fire(a);
     setFlow(null);
   };
   // After the keeper: who took the shot? (skipped with nobody listed, or when editing)
@@ -1065,7 +1068,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         return panel(`⭕ Penalty — ${sideName}`, 'Who gave it away? (optional)', (
           <>
             <PlayerTable players={xi(opp(side))} onPick={(p) => {
-              for (const a of penaltyConcededActions(side, p, wonBy, { fouls: t.fouls, at: Date.now(), tracked: trackedKeys() })) fire(a);
+              for (const a of penaltyConcededActions(side, p, wonBy, { fouls: t.fouls, at: Date.now(), tracked: trackedKeys(['penaltyWon', 'foul']) })) fire(a);
               setFlow({ mode: 'pen', step: 'card', side, conceder: p });
             }} />
             <Button label="Skip — not recorded" variant="ghost" onPress={() => after(wonBy)} />

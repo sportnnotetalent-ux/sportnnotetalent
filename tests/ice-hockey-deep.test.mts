@@ -130,13 +130,17 @@ describe('deep wave · optional tallies (faceoffs, hits, blocks, giveaways, take
     assert.equal(t.h6.stats.missedShots, 1);
     assert.equal(t.h3.stats.faceoffWins, 0, 'tracked → 0, not "not tracked"');
   });
-  test('only the switched-on toggles own their keys', () => {
+  test('only the recorded tallies own their keys', () => {
+    // no-false-zeros NZI8: switched on with none recorded owns nothing (was: a 0 on every line)
     const s = run(log.filter((a) => a.type !== 'TALLY'), { trackFaceoffs: true });
     const t = iceHockeyTotals(s);
-    assert.equal(t.h3.stats.faceoffWins, 0);
+    assert.equal('faceoffWins' in t.h3.stats, false);
     assert.equal('checks' in t.h3.stats, false);
-    assert.equal(tallyTracked(s, 'trackFaceoffs'), true);
+    assert.equal(tallyTracked(s, 'trackFaceoffs'), false);
     assert.equal(tallyTracked(s, 'trackPhysical'), false);
+    const s2 = run(log.filter((a) => a.type !== 'TALLY' || a.payload?.kind === 'faceoff'), { trackFaceoffs: true });
+    assert.equal(iceHockeyTotals(s2).h3.stats.faceoffWins, 0, 'one faceoff recorded → 0 for the others');
+    assert.equal(tallyTracked(s2, 'trackFaceoffs'), true);
   });
   test('box: FO won-lost, FO%, HIT, BLK, TK, GV, MS columns when tracked', () => {
     const s = run(log, SPORT.config);

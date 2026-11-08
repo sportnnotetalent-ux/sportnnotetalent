@@ -20,7 +20,7 @@ import type { ScoreAction, VoiceContext, VoiceEnding } from '../types';
 import { deburr, matchPlayer, resolveSide, withoutTeams } from '../voiceMatch.ts';
 import {
   creditAttribution, eventCredits, goalFlagsNow, goalieAt, matchSec, nextIsOvertime, periodLong, periodStarted, timeoutLeft,
-  tallyTracked, zonesTracked, flagOf, FLAG_KEYS, FO_ZONE_KEYS, INFRACTIONS, LIVE_KEYS, TRACK_FLAGS,
+  tallyOffered, zonesOffered, iceTrackedKeys, flagOf, INFRACTIONS, LIVE_KEYS,
   type FoZone, type IceEvent, type IceHockeyState, type PenKind, type Side, type TallyKind,
 } from './engine.ts';
 
@@ -98,12 +98,14 @@ export function iceHockeyVoice(text: string, ctx: VoiceContext): ScoreAction[] |
   if (/\btime ?out\b/.test(q)) return timeoutLeft(s, side) > 0 ? [{ type: 'TIMEOUT', side, payload: stamp() }] : null;
   if (/\bpull(ed)?\b.*\b(goalie|goaltender|keeper)\b|\bempty net\b.*\bpull/.test(q)) return [{ type: 'PULL', side, payload: stamp() }];
   if (/\b(goalie|goaltender|keeper)\b.*\bback\b/.test(q)) return [{ type: 'BACK', side, payload: stamp() }];
-  const tally = !/\bgoal\b/.test(q) ? TALLY_WORDS.find(([k, re]) => re.test(q) && tallyTracked(s, flagOf(k)))?.[0] : undefined;
+  // NZI9: voice offers what the toggles switch on (tracked = recorded, below)
+  const tally = !/\bgoal\b/.test(q) ? TALLY_WORDS.find(([k, re]) => re.test(q) && tallyOffered(s, flagOf(k)))?.[0] : undefined;
   if (tally) {
-    const zones = zonesTracked(s);
-    const tracked = [...TRACKED, ...TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f]), ...(zones ? FO_ZONE_KEYS : [])];
-    // round 2: a zone said with a faceoff (zones tracked) — "faceoff Rao offensive zone"
+    const zones = zonesOffered(s);
+    // round 2: a zone said with a faceoff (zones offered) — "faceoff Rao offensive zone"
     const zone = tally === 'faceoff' && zones ? ZONE_WORDS.find(([, re]) => re.test(q))?.[0] : undefined;
+    // NZI10: the stamp includes this tally (its own line lists its key)
+    const tracked = [...TRACKED, ...iceTrackedKeys(s, { type: 'tally', side, tally, ...(zone ? { zone } : {}) })];
     const c = eventCredits({ type: 'tally', side, tally, playerId: player?.id, ...(zone ? { zone } : {}) }, s.pimScale);
     const a1 = creditAttribution(c.first, 1, tracked);
     return [{ type: 'TALLY', side, payload: { kind: tally, ...(zone ? { zone } : {}), ...stamp() }, ...(a1 ? { attribution: a1 } : {}) }];

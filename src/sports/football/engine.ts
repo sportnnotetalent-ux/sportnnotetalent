@@ -71,6 +71,11 @@ export interface FootballState {
   stats: StatEvent[];
   /** time-based possession: who has the ball, when they got it, accrued ms each */
   possession: { side: 'home' | 'away' | null; sinceAt?: number; acc: { home: number; away: number } };
+  /** NZI6 (no false zeros): the possession bar was tapped at least once. Fouls,
+   *  tackles and corners hand the ball over on their own, so without a tap the
+   *  split is not a possession figure. Set by POSSESSION only (absent on a log
+   *  that never used the bar). */
+  possBar?: true;
   /** which aspects this scorer is tracking for THIS match (game-wise settings) */
   track: TrackConfig;
   /** SD-08: live events are stamped with the ORDINAL minute (FIFA: a goal at
@@ -534,7 +539,7 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
       const at = Number(a.payload?.at);
       const side = a.payload?.side as 'home' | 'away';
       if (side !== 'home' && side !== 'away') return s;
-      return { ...s, possession: { side, sinceAt: at, acc: accrue(s, at) } };
+      return { ...s, possBar: true, possession: { side, sinceAt: at, acc: accrue(s, at) } };
     }
     case 'STAT': {
       const kind = a.payload?.kind as StatKind;

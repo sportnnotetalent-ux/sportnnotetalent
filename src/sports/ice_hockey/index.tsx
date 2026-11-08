@@ -39,7 +39,7 @@ import {
   periodStarted, running, eventCredits, creditAttribution, goalFlagsNow, goalieAt, goalieOf, netEmpty, penaltyBox, partEnd, skatersOn, baseSkaters,
   soScore, nextShooter, needsSdPick, iceHockeyScoreLine, timeoutLeft, totalPeriods, nextIsOvertime, eventWhen, standingsUnits, ejects,
   ICE_HOCKEY_PRESETS, ICE_HOCKEY_LIVE_SETTINGS, PEN_LABEL, INFRACTIONS, STRENGTH_LABEL, LIVE_KEYS,
-  TALLY_LABEL, TRACK_FLAGS, TRACK_KINDS, TRACK_FIELDS, FLAG_KEYS, FO_ZONE_KEYS, tallyTracked, zonesTracked, soAction, penaltyShotAction,
+  TALLY_LABEL, TRACK_FLAGS, TRACK_KINDS, TRACK_FIELDS, iceTrackedKeys, soAction, penaltyShotAction,
   type FoZone, type IceEvent, type IceHockeyState, type PenKind, type Side, type Strength, type TallyKind,
 } from './engine';
 import { iceHockeyCommentary, iceScopeLabel, ICE_FEED_TAGS } from './commentary';
@@ -66,7 +66,8 @@ const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(
 const isGoaliePos = (p?: string | null) => !!p && /^\s*(g|gk|goalie|goaltender|goal\s*-?\s*keeper|netminder)\s*$/i.test(p);
 const BASE_TRACKED: string[] = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
 /** the keys this match tracks (the base set + the optional tallies switched on + round 2's faceoff zones) */
-const trackedKeys = (s: IceHockeyState): string[] => [...BASE_TRACKED, ...TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f]), ...(zonesTracked(s) ? FO_ZONE_KEYS : [])];
+// NZI8/NZI10 (no false zeros): the tallies already recorded, plus the event being recorded now
+const trackedKeys = (s: IceHockeyState, add?: Parameters<typeof eventCredits>[0]): string[] => [...BASE_TRACKED, ...iceTrackedKeys(s, add)];
 const TALLY_CHIP: Record<TallyKind, string> = { faceoff: '⚪ Faceoff won', hit: '💥 Hit', block: '🛡 Block', takeaway: '✂️ Takeaway', giveaway: '🎁 Giveaway', missed: '↗ Missed shot' };
 const PEN_MENU: PenKind[] = ['minor', 'double', 'major', 'majorGm', 'misconduct', 'gm', 'match', 'bench'];
 
@@ -196,7 +197,8 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
   const TRACKED = trackedKeys(s);
   const credit = (e: Parameters<typeof eventCredits>[0]) => {
     const cr = eventCredits(e, s.pimScale);
-    return { attribution: creditAttribution(cr.first, 1, TRACKED), attribution2: creditAttribution(cr.second, 1, TRACKED), third: creditAttribution(cr.third, 1, TRACKED) };
+    const tr = trackedKeys(s, e);
+    return { attribution: creditAttribution(cr.first, 1, tr), attribution2: creditAttribution(cr.second, 1, tr), third: creditAttribution(cr.third, 1, tr) };
   };
   /** deep wave: an optional tally (a faceoff credits the winning centre and the loser;
    *  round 2: with zones tracked, the zone from the winner's view) */

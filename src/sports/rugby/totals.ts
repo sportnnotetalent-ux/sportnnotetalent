@@ -19,7 +19,7 @@
  */
 import { trackField, timeLeft, type FieldEvent, type FieldLog, type FieldResult, type Who } from '../onField.ts';
 import {
-  detailTracked, eventCredits, matchSec, pointsOf, trackedTallyKeys, DETAIL_STATS, type RugbyEvent, type RugbyState, type Side,
+  detailStatsTracked, eventCredits, matchSec, pointsOf, trackedTallyKeys, type RugbyEvent, type RugbyState, type Side,
 } from './engine.ts';
 import { legacyNameOf, nameFor, type NameOf } from '../invasion/names.ts';
 
@@ -107,12 +107,13 @@ export function rugbyTotals(s: RugbyState): Record<string, { side: Side; stats: 
     if (!p.played || !p.id || !stamped(s, p.side)) continue;
     line(p.id, p.side).stats.minutes = Math.round(p.minutes);
   }
-  const detail = detailTracked(s);
+  // NZI11 (no false zeros): per kind, once one was recorded
+  const detail = detailStatsTracked(s);
   // deep wave: a tracked "Stats to track" key reads 0 for everyone with a line (untracked: absent, never a false 0)
   const tallies = trackedTallyKeys(s);
   for (const l of Object.values(out)) {
     for (const k of ['points', 'tries', 'conversions', 'conversionAttempts', 'penGoals', 'penGoalAttempts', 'dropGoals', 'dropGoalAttempts', 'yellowCards', 'redCards'] as const) l.stats[k] ??= 0;
-    if (detail) for (const k of DETAIL_STATS) l.stats[k] ??= 0;
+    for (const k of detail) l.stats[k] ??= 0;
     for (const k of tallies) l.stats[k] ??= 0;
   }
   return out;

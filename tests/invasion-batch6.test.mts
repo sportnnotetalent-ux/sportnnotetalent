@@ -469,7 +469,8 @@ describe('X · union / league restart and penalty-use depth', () => {
   test('X4 no restart section on a match that never tracked them; the toggle is in Info, off by default', () => {
     assert.equal(rugbySheet(ru.init({})).sections.some((x) => x.key === 'restarts'), false);
     assert.equal(leagueSheet(rl.init({})).sections.some((x) => x.key === 'restarts'), false);
-    assert.ok(rugbySheet(ru.init({ trackRestarts: true })).sections.some((x) => x.key === 'restarts'));
+    // no-false-zeros NZI13: switched on with none recorded is no section of zeros
+    assert.equal(rugbySheet(ru.init({ trackRestarts: true })).sections.some((x) => x.key === 'restarts'), false);
     for (const [ls, meta, st] of [[RUGBY_LIVE_SETTINGS, RUGBY_META, ru.init({})], [LEAGUE_LIVE_SETTINGS, RUGBY_LEAGUE_META, rl.init({})]] as const) {
       assert.ok(ls.fields.some((f) => f.key === 'trackRestarts'));
       assert.equal(meta.formatFields.find((f) => f.key === 'trackRestarts')?.default, false);

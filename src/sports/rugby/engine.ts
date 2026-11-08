@@ -715,27 +715,46 @@ export function teamFigures(s: RugbyState, side: Side, scope: 'all' | number = '
 
 /* ------------------------- deep wave: what's tracked ------------------------- */
 
-/** The optional detail (tackles, carries…) — the toggle on, or any recorded
- *  (the rule the stat lines have always used). */
+// NZI11 (no false zeros, docs/security/breaks/no-false-zeros-invasion.md): an
+// option counts as tracked only once one was recorded, per kind. The toggle
+// means "offered" (the buttons); switched on with nothing recorded writes no
+// key, no column, no row. A tackle and a missed tackle are one family.
+
+/** The detail kinds recorded in the match (a tackle brings its missed-tackle
+ *  pair and back: tackle success needs both). */
+export function detailKindsTracked(s: Pick<RugbyState, 'events'>): DetailKey[] {
+  const got = new Set(s.events.filter((e) => e.type === 'detail' && !!e.detail).map((e) => e.detail as DetailKey));
+  if (got.has('tackle') || got.has('missedTackle')) { got.add('tackle'); got.add('missedTackle'); }
+  return DETAIL_KEYS.filter((k) => got.has(k));
+}
+/** The detail stat keys recorded in the match (every line reads 0 for them). */
+export const detailStatsTracked = (s: Pick<RugbyState, 'events'>): string[] => detailKindsTracked(s).map((k) => DETAIL_STAT[k]);
+/** Any optional detail (tackles, carries…) recorded? */
 export const detailTracked = (s: Pick<RugbyState, 'trackDetail' | 'events'>): boolean =>
-  s.trackDetail || s.events.some((e) => e.type === 'detail');
-/** Is this "Stats to track" item tracked in the match — its toggle on, or any recorded? */
+  s.events.some((e) => e.type === 'detail');
+/** Is this tally kind recorded in the match? */
+export const tallyKindTracked = (s: Pick<RugbyState, 'events'>, k: TallyKind): boolean =>
+  s.events.some((e) => e.type === 'tally' && e.tally === k);
+/** Is this "Stats to track" item tracked in the match — any of it recorded
+ *  (possession: any ball switch)? */
 export const tallyTracked = (s: Pick<RugbyState, TrackFlag | 'events' | 'ball'>, f: TrackFlag): boolean =>
-  s[f] === true
-  || s.events.some((e) => e.type === 'tally' && !!e.tally && TRACK_KINDS[f].includes(e.tally))
-  || (f === 'trackPossession' && !!s.ball?.length);
-/** Penalties conceded are counted — from the detail button or the penalty toggle. */
-export const penaltiesTracked = (s: RugbyState): boolean => detailTracked(s) || tallyTracked(s, 'trackPenalties');
+  f === 'trackPossession' ? !!s.ball?.length : TRACK_KINDS[f].some((k) => tallyKindTracked(s, k));
+/** Penalties conceded are counted — one recorded from the detail button or the penalty toggle. */
+export const penaltiesTracked = (s: RugbyState): boolean => detailKindsTracked(s).includes('penaltyConceded') || tallyTracked(s, 'trackPenalties');
 /** Round 2 — free kicks are credited to players in this match: one was
  *  recorded with the player asked (or names a player). Old one-tap free kicks
  *  never were, so their matches never carry the key. */
 export const freeKicksAsked = (s: Pick<RugbyState, 'events'>): boolean =>
   s.events.some((e) => e.type === 'tally' && e.tally === 'freeKick' && (e.asked === true || !!e.playerId || !!e.playerName));
-/** The tracked player keys of the toggles (every line reads 0 for them). */
-export const trackedTallyKeys = (s: RugbyState): string[] => [...new Set([
-  ...TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f]),
-  ...(freeKicksAsked(s) ? ['freeKicksConceded'] : []),
-])];
+/** The tracked tally player keys, per kind (every line reads 0 for them);
+ *  `add` = the event being recorded now (NZI10: its own line lists it). */
+export function trackedTallyKeys(s: Pick<RugbyState, 'events'>, add?: Partial<RugbyEvent>): string[] {
+  const t = add ? { ...s, events: [...s.events, add as RugbyEvent] } : s;
+  return [...new Set([
+    ...(['penalty', 'turnover', 'offload'] as const).filter((k) => tallyKindTracked(t, k)).map((k) => TALLY_KEY[k]!),
+    ...(freeKicksAsked(t) ? ['freeKicksConceded'] : []),
+  ])];
+}
 
 /** The switches of one kind in time order (a backfilled tap at its own time). */
 const marksOf = (s: Pick<RugbyState, 'ball'>, kind: 'poss' | 'terr'): BallMark[] =>

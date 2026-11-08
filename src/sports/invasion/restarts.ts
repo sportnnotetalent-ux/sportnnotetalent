@@ -50,9 +50,10 @@ export const restartAction = (side: Side, kind: RestartKind): ScoreAction => ({ 
 export const restartConfig = (config?: Record<string, unknown>): { trackRestarts?: true } => (config?.trackRestarts === true ? { trackRestarts: true } : {});
 
 type RestartEvent = { type: string; side: Side; period: number; restart?: RestartKind };
-/** Tracked in the match: the toggle, or any recorded. */
+/** Tracked in the match: any recorded. NZI13 (no false zeros): the toggle only
+ *  offers the chips — switched on with none recorded is no section of zeros. */
 export const restartsTracked = (s: { trackRestarts?: boolean; events: RestartEvent[] }): boolean =>
-  s.trackRestarts === true || s.events.some((e) => e.type === 'restart');
+  s.events.some((e) => e.type === 'restart');
 
 /** The sheet's "Kicks & restarts" section (null when the match never tracked them). */
 export function restartSection(code: 'rugby' | 'rugby_league', s: { trackRestarts?: boolean; events: RestartEvent[] }, scope: 'all' | number = 'all'): SheetSection | null {

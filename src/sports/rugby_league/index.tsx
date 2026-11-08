@@ -68,7 +68,8 @@ import { MainAction } from '../MainAction';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 /** the keys this match tracks (the base set + the detail switched on) */
-const trackedKeys = (s: LeagueState): string[] => [...LIVE_KEYS, ...trackedDetailKeys(s)];
+// NZI10/NZI12 (no false zeros): the detail recorded, plus the event being recorded now
+const trackedKeys = (s: LeagueState, add?: Parameters<typeof eventCredits>[0]): string[] => [...LIVE_KEYS, ...trackedDetailKeys(s, add)];
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 
 /* ------------------------------ player picker ------------------------------ */
@@ -177,10 +178,10 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
   const kickers = (sd: Side): Player[] => onField(sd);
 
   /* ---- recorders ---- */
-  const TRACKED = trackedKeys(s);
   const credit = (e: Parameters<typeof eventCredits>[0]) => {
     const cr = eventCredits(e);
-    return { attribution: creditAttribution(cr.first, 1, TRACKED), attribution2: creditAttribution(cr.second, 1, TRACKED) };
+    const tr = trackedKeys(s, e);
+    return { attribution: creditAttribution(cr.first, 1, tr), attribution2: creditAttribution(cr.second, 1, tr) };
   };
   const conversionNext = (sd: Side) => {
     // golden point: a try ends the match (no conversion); a re-entered try keeps its own conversion row

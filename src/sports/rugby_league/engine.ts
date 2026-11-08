@@ -667,16 +667,31 @@ export function teamFigures(s: LeagueState, side: Side, scope: 'all' | number = 
 
 /* ---------------------------- what's tracked ---------------------------- */
 
-/** Is this "Stats to track" item tracked in the match — its toggle on, or any recorded? */
+// NZI12 (no false zeros, docs/security/breaks/no-false-zeros-invasion.md): an
+// option counts as tracked only once one was recorded, per kind. The toggle
+// means "offered" (the buttons); switched on with nothing recorded writes no
+// key, no column, no row. A tackle and a missed tackle are one family.
+
+/** Is this "Stats to track" item tracked in the match — any of it recorded
+ *  (six-tackle sets: any mark in the set log)? */
 export function tracked(s: Pick<LeagueState, TrackFlag | 'events' | 'setLog'>, f: TrackFlag): boolean {
-  if (s[f] === true) return true;
   if (f === 'trackSets') return !!s.setLog?.length;
   return s.events.some((e) => e.type === 'detail' && !!e.detail && FLAG_DETAILS[f].includes(e.detail));
 }
-/** The detail kinds tracked in the match. */
-export const trackedDetails = (s: LeagueState): DetailKey[] => TRACK_FLAGS.filter((f) => tracked(s, f)).flatMap((f) => FLAG_DETAILS[f]);
-/** The tracked detail keys (every line reads 0 for them; untracked: absent — never a false 0). */
-export const trackedDetailKeys = (s: LeagueState): string[] => trackedDetails(s).map((d) => DETAIL_STAT[d]);
+/** The detail kinds recorded in the match (a tackle brings its missed-tackle
+ *  pair and back: tackle efficiency needs both). */
+export function trackedDetails(s: Pick<LeagueState, 'events'>): DetailKey[] {
+  const got = new Set(s.events.filter((e) => e.type === 'detail' && !!e.detail).map((e) => e.detail as DetailKey));
+  if (got.has('tackle') || got.has('missedTackle')) { got.add('tackle'); got.add('missedTackle'); }
+  return DETAIL_KEYS.filter((d) => got.has(d));
+}
+/** The tracked detail keys (every line reads 0 for them; untracked: absent —
+ *  never a false 0). `add` = the event being recorded now (NZI10: its own
+ *  line lists its key). */
+export function trackedDetailKeys(s: Pick<LeagueState, 'events'>, add?: Partial<LeagueEvent>): string[] {
+  const t = add ? { ...s, events: [...s.events, add as LeagueEvent] } : s;
+  return trackedDetails(t).map((d) => DETAIL_STAT[d]);
+}
 
 /** SD-17 standings units: tries per side (a tries tie-break, if an organiser adds one). */
 export const leagueStandingsUnits = (s: LeagueState) => (s && Array.isArray(s.events) ? { tries: triesOf(s) } : null);

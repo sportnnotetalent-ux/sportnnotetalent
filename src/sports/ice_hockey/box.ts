@@ -8,7 +8,7 @@
  */
 import type { Player } from '../../core/types';
 import type { BoxRowInput, BoxSideInput, MatchBoxSource } from '../boxScore.ts';
-import { eventCredits, periodName, tallyTracked, teamFigures, totalPeriods, FLAG_KEYS, LIVE_KEYS, TALLY_KEYS, TRACK_FLAGS, type IceHockeyState, type Side } from './engine.ts';
+import { eventCredits, iceTrackedKeys, periodName, teamFigures, totalPeriods, LIVE_KEYS, TALLY_KEYS, type IceHockeyState, type Side } from './engine.ts';
 import { iceHockeyTotals } from './totals.ts';
 import { withNames, type NameOf } from '../invasion/names.ts';
 import { withRosters } from '../racketNames.ts';
@@ -26,8 +26,9 @@ export function iceHockeyBox(s0: IceHockeyState, ctx: IceHockeyBoxContext = {}):
   const s = withNames(s0, withRosters(ctx.nameOf, ctx.homeRoster, ctx.awayRoster));
   const n = Math.min(totalPeriods(s), Math.max(1, s.period));
   const periods = n >= 2 ? Array.from({ length: n }, (_, i) => ({ value: i + 1, label: periodName(s, i + 1) })) : [];
-  // deep wave: a tracked tally's keys read 0 on every row (an untracked one is absent: no column)
-  const ROW_KEYS: string[] = [...BASE_KEYS, ...TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f])];
+  // deep wave: a tracked tally's keys read 0 on every row (an untracked one is absent: no column);
+  // NZI8: per kind, once one was recorded (switched on alone: no column)
+  const ROW_KEYS: string[] = [...BASE_KEYS, ...iceTrackedKeys(s).filter((k) => CREDIT_KEYS.has(k))];
   return {
     periods,
     emptyText: 'No players yet.',

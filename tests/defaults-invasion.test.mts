@@ -83,7 +83,9 @@ describe('rugby union', () => {
     assert.equal(flag(fields, 'trackPenalties')?.default, true);
     assert.equal(rugby.init(newMatch(fields)).trackPenalties, true);
     assert.equal(rugby.init(newMatch(fields, 'tournament')).trackPenalties, true);
-    assert.ok(rugby.trackedTallyKeys(rugby.init(newMatch(fields))).includes('penaltiesGivenAway'));
+    // no-false-zeros NZI11: switched on = offered; the key is tracked once a penalty is recorded
+    assert.equal(rugby.trackedTallyKeys(rugby.init(newMatch(fields))).includes('penaltiesGivenAway'), false);
+    assert.ok(rugby.trackedTallyKeys(rugby.init(newMatch(fields)), { type: 'tally', side: 'home', tally: 'penalty' }).includes('penaltiesGivenAway'));
   });
   test('only penalties: the other "Stats to track" stay off for a new match', () => {
     const s = rugby.init(newMatch(fields));
@@ -114,7 +116,9 @@ describe('rugby league', () => {
     assert.equal(flag(fields, 'trackErrors')?.default, true);
     const s = league.init(newMatch(fields));
     assert.equal(s.trackErrors, true);
-    assert.deepEqual(league.trackedDetailKeys(s).length, 2);
+    // no-false-zeros NZI12: switched on = offered; each kind is tracked once one is recorded
+    assert.deepEqual(league.trackedDetailKeys(s), []);
+    assert.deepEqual(league.trackedDetailKeys(s, { type: 'detail', side: 'home', detail: 'error' }), ['handlingErrors']);
   });
   test('only errors: sets, defence and attack stay off for a new match', () => {
     const s = league.init(newMatch(fields));

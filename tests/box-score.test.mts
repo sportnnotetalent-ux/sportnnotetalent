@@ -489,7 +489,13 @@ describe('SD-23 · team comparison panel', () => {
       ] as [string, number | string, number | string, boolean, boolean?][];
       // Deep wave (2026-10-22): possession shows only once the bar was used and the
       // ball changed hands — this match never used it, so the old false "100% – 0%" row is gone.
-      const shown = old.filter((r) => (sc === 'all' || !r[4]) && r[3] && r[0] !== 'Possession').map((r) => [r[0], String(r[1]), String(r[2])]);
+      // no-false-zeros NZI4: a switched-on row shows only once its kind was captured in
+      // the match (cards are a core record) — "Tackles 0 v 0" for a toggle nobody used is gone.
+      const KIND: Record<string, string> = { Shots: 'shot', 'Shots on target': 'shot', 'Blocked shots': 'shot', Passes: 'pass', 'Pass accuracy': 'pass', Fouls: 'foul',
+        Offsides: 'offside', Corners: 'corner', Tackles: 'tackle', Interceptions: 'interception', Saves: 'save', Crosses: 'cross', Dribbles: 'dribble',
+        Handballs: 'handball', 'Attacking plays': 'attackContribution', 'Defensive plays': 'defenceContribution' };
+      const captured = (label: string) => !(label in KIND) || s.stats.some((e) => e.kind === KIND[label]);
+      const shown = old.filter((r) => (sc === 'all' || !r[4]) && r[3] && r[0] !== 'Possession' && captured(r[0])).map((r) => [r[0], String(r[1]), String(r[2])]);
       const untracked = old.filter((r) => !r[3]).map((r) => r[0]);
       const cmp = comparisonRows(STAT_SCHEMAS.football, src.data(sc), sc);
       assert.deepEqual(cmp.rows.map((r) => [r.label, r.home, r.away]), shown, `scope ${sc}`);

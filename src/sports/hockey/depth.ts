@@ -17,12 +17,14 @@ import { matchSec, periodOffset, type HockeyState, type Side } from './engine.ts
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 
-/** Did the match track possession (the toggle, or any "ball" tap)? */
-export const possessionTracked = (s: Pick<HockeyState, 'track' | 'poss'>): boolean => s.track?.possession === true || !!s.poss?.length;
+/** Did the match track possession — any "ball" tap? NZI7 (no false zeros):
+ *  the toggle alone only offers the bar. */
+export const possessionTracked = (s: Pick<HockeyState, 'track' | 'poss'>): boolean => !!s.poss?.length;
 /** Did the match split misses into wide / blocked (new logs)? */
 export const missTracked = (s: Pick<HockeyState, 'events'>): boolean => s.events.some((e) => e.type === 'shot' && !!e.miss);
-/** Did the match track video referrals? */
-export const referralsTracked = (s: Pick<HockeyState, 'track' | 'events'>): boolean => s.track?.referrals === true || s.events.some((e) => e.type === 'referral');
+/** Did the match track video referrals — any logged? NZI7: switched on with
+ *  none logged is no "Referrals won 0 v 0". */
+export const referralsTracked = (s: Pick<HockeyState, 'track' | 'events'>): boolean => s.events.some((e) => e.type === 'referral');
 
 /** Seconds of possession per side over [from, to) on the game clock. */
 export function possessionSecs(s: HockeyState, from: number, to: number): { home: number; away: number } {
@@ -81,7 +83,8 @@ export function hockeyDepthFigures(s: HockeyState, side: Side, scope: 'all' | nu
 /** The depth keys the match didn't track (listed "not tracked" on the panel). */
 export function hockeyUntracked(s: HockeyState): string[] {
   return [
-    ...(possessionTracked(s) ? [] : ['possession']),
+    // NZI7: the note names an option that is off (on with no tap: no row)
+    ...(s.track?.possession === true || possessionTracked(s) ? [] : ['possession']),
     ...(missTracked(s) ? [] : ['shotsWide', 'blockedShots']),
   ];
 }

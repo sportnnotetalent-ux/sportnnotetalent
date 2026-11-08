@@ -32,7 +32,7 @@ import { mergeTotals } from '../racketTotals.ts';
 import type { FootballState } from './engine.ts';
 import type { FootballEvent, GoalType, StatEvent, StatKind } from './events.ts';
 import { footballTotals } from './fieldTime.ts';
-import { footballShotDetailTotals, optionalStatKeys, SHOT_DETAIL_KEYS } from './depth.ts';
+import { footballCapturedKeys, footballShotDetailTotals, optionalStatKeys, SHOT_DETAIL_KEYS } from './depth.ts';
 
 type Side = 'home' | 'away';
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -191,7 +191,10 @@ export function footballBoxTotals(s: FootballState, ctx?: StatTotalsContext): Re
   // sync sets each one (a key nobody has would otherwise not be owned). An
   // OG-only player gets just `ownGoals` (no false zeros on a new line).
   // deep wave: key passes / clearances only in a match that tracked them
-  const keys = [...FOOTBALL_STAT_KEYS, ...optionalStatKeys(s), ...(eventsOk ? FOOTBALL_EVENT_KEYS : []), ...(ogOk && Object.keys(ogLines).length ? ['ownGoals'] : [])];
+  // NZI2 (no false zeros): a toggle-fed key only once its kind was captured —
+  // football totals are partial, so a key not owned here still moves by live
+  // increments and correction deltas
+  const keys = [...footballCapturedKeys([...FOOTBALL_STAT_KEYS], s), ...optionalStatKeys(s), ...(eventsOk ? footballCapturedKeys([...FOOTBALL_EVENT_KEYS], s) : []), ...(ogOk && Object.keys(ogLines).length ? ['ownGoals'] : [])];
   const out: Lines = {};
   const credited = [statLines, ...(eventsOk ? [eventLines] : [])];
   for (const lines of credited) {

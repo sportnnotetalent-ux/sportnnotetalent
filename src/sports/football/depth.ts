@@ -20,7 +20,8 @@
  */
 import type { StatTotalsEntry } from '../types';
 import { pct, putIf } from '../invasion/centre.ts';
-import type { FootballState } from './engine.ts';
+import type { FootballState, TrackConfig } from './engine.ts';
+import type { StatKind } from './events.ts';
 import { possessionPct } from './engine.ts';
 import { isSetPieceGoal } from './events.ts';
 
@@ -29,23 +30,53 @@ const SIDES = ['home', 'away'] as const;
 
 /* --------------------------------- tracked --------------------------------- */
 
-/** Shot detail: the toggle, or any shot / goal carrying it (a match that
- *  switched it off later keeps what it logged). */
-export const shotDetailTracked = (s: Pick<FootballState, 'deep' | 'events' | 'stats'>): boolean =>
-  s.deep?.shotDetail === true
-  || (s.stats ?? []).some((e) => e.kind === 'shot' && (!!e.zone || !!e.bigChance || !!e.woodwork))
+// NZI5 (no false zeros, docs/security/breaks/no-false-zeros-invasion.md): an
+// option counts as tracked only once one was logged. The toggle means
+// "offered" (the buttons); switched on with nothing logged shows nothing.
+
+/** Shot detail: any shot / goal carrying it. */
+export const shotDetailTracked = (s: Pick<FootballState, 'events' | 'stats'>): boolean =>
+  (s.stats ?? []).some((e) => e.kind === 'shot' && (!!e.zone || !!e.bigChance || !!e.woodwork))
   || (s.events ?? []).some((e) => e.type === 'goal' && (!!e.zone || !!e.bigChance));
-export const keyPassesTracked = (s: Pick<FootballState, 'deep' | 'stats'>): boolean =>
-  s.deep?.keyPasses === true || (s.stats ?? []).some((e) => e.kind === 'keyPass');
-export const clearancesTracked = (s: Pick<FootballState, 'deep' | 'stats'>): boolean =>
-  s.deep?.clearances === true || (s.stats ?? []).some((e) => e.kind === 'clearance');
-export const setPiecesTracked = (s: Pick<FootballState, 'deep' | 'stats'>): boolean =>
-  s.deep?.setPieces === true || (s.stats ?? []).some((e) => e.kind === 'goalKick' || e.kind === 'throwIn');
-/** Round 2 — goals ruled out: the toggle (the button shows only then), or
- *  any logged (an older match, or one that switched it off later, keeps what
- *  it logged). */
-export const ruledOutTracked = (s: Pick<FootballState, 'deep' | 'events'>): boolean =>
-  s.deep?.ruledOut === true || (s.events ?? []).some((e) => e.type === 'nogoal');
+export const keyPassesTracked = (s: Pick<FootballState, 'stats'>): boolean =>
+  (s.stats ?? []).some((e) => e.kind === 'keyPass');
+export const clearancesTracked = (s: Pick<FootballState, 'stats'>): boolean =>
+  (s.stats ?? []).some((e) => e.kind === 'clearance');
+export const setPiecesTracked = (s: Pick<FootballState, 'stats'>): boolean =>
+  (s.stats ?? []).some((e) => e.kind === 'goalKick' || e.kind === 'throwIn');
+/** Round 2 — goals ruled out: any logged (the button shows with the toggle). */
+export const ruledOutTracked = (s: Pick<FootballState, 'events'>): boolean =>
+  (s.events ?? []).some((e) => e.type === 'nogoal');
+
+/** NZI1–4 — has the match captured a stat event of this kind? */
+export const kindCaptured = (s: Pick<FootballState, 'stats'>, ...kinds: StatKind[]): boolean =>
+  (s.stats ?? []).some((e) => kinds.includes(e.kind));
+
+/** NZI1/NZI2 — the toggle-fed player keys and the stat kind that feeds each.
+ *  Everything else (goals, assists, cards, penalties won / missed, clean
+ *  sheets) is a core record every match takes, never a "Stats to track". */
+export const KEY_KIND: Record<string, StatKind> = {
+  shots: 'shot', shotsOnTarget: 'shot', blocks: 'block', fouls: 'foul', tackles: 'tackle', interceptions: 'interception', saves: 'save',
+  passes: 'pass', passesComplete: 'pass', attackingContributions: 'attackContribution', defensiveContributions: 'defenceContribution',
+  crosses: 'cross', dribbles: 'dribble', offsides: 'offside', handballs: 'handball', keyPasses: 'keyPass', clearances: 'clearance',
+};
+
+/** NZI1 — of the keys a match offers (`footballTrackedKeys`), the ones it has
+ *  captured: a toggle-fed key only once an event of its kind is in the match.
+ *  `adding` = the kinds being recorded right now, so the first tackle's own
+ *  line already lists `tackles`. */
+export function footballCapturedKeys(keys: string[], s: Pick<FootballState, 'stats'>, adding: StatKind[] = []): string[] {
+  const kinds = new Set<StatKind>([...(s.stats ?? []).map((e) => e.kind), ...adding]);
+  return keys.filter((k) => !(k in KEY_KIND) || kinds.has(KEY_KIND[k]));
+}
+
+/** NZI4 — the stat kinds behind each base toggle's team rows (cards: a core
+ *  record; possession: the bar, `footballPossession`). */
+export const TOGGLE_KINDS: Partial<Record<keyof TrackConfig, StatKind[]>> = {
+  shots: ['shot'], passes: ['pass'], fouls: ['foul'], offsides: ['offside'], corners: ['corner'], tackles: ['tackle'],
+  interceptions: ['interception'], saves: ['save'], crosses: ['cross'], dribbles: ['dribble'], handball: ['handball'],
+  attackContribution: ['attackContribution'], defenceContribution: ['defenceContribution'],
+};
 
 /** The optional live-credited keys to zero-fill on credited players' lines
  *  (only for a match that tracked them — no false 0 elsewhere). */
@@ -97,7 +128,8 @@ export function footballDepthTeamStats(s: FootballState): Record<Side, Record<st
   for (const side of SIDES) {
     const o = out[side];
     const opp: Side = side === 'home' ? 'away' : 'home';
-    if (t?.shots !== false) {
+    // NZI5: only once a shot / a save was captured (the toggle alone gives 0 v 0)
+    if (t?.shots !== false && kindCaptured(s, 'shot')) {
       // Opta: shots = on target + off target + blocked (a goal is on target)
       o.shotsOffTarget = count(side, (e) => e.kind === 'shot' && !e.onTarget && !e.blocked);
     }
@@ -118,7 +150,7 @@ export function footballDepthTeamStats(s: FootballState): Record<Side, Record<st
     }
     // team save %: saves ÷ shots on target faced (saves + goals let in; an own
     // goal is no shot the keeper faced) — only when saves were tracked
-    if (t?.saves !== false) {
+    if (t?.saves !== false && kindCaptured(s, 'save')) {
       const sv = count(side, (e) => e.kind === 'save');
       putIf(o, 'savePct', pct(sv, sv + goals(opp)));
     }
@@ -146,9 +178,11 @@ export function footballDepthTeamStats(s: FootballState): Record<Side, Record<st
 /** The depth keys the match didn't track, one per toggle (the panel's "not
  *  tracked" note names them; the other rows of a toggle simply don't show). */
 export function footballDepthUntracked(s: FootballState): string[] {
+  // NZI5: an option that is on but has nothing logged simply has no row (the
+  // note would tell the scorer to switch on what is already on)
   return [
-    ...(shotDetailTracked(s) ? [] : ['bigChances']),
-    ...(keyPassesTracked(s) ? [] : ['keyPasses']),
+    ...(s.deep?.shotDetail === true || shotDetailTracked(s) ? [] : ['bigChances']),
+    ...(s.deep?.keyPasses === true || keyPassesTracked(s) ? [] : ['keyPasses']),
   ];
 }
 
@@ -157,7 +191,9 @@ export function footballDepthUntracked(s: FootballState): string[] {
  *  ball to one side, so a scorer who never used the possession bar would
  *  otherwise read a false "100% – 0%". */
 export function footballPossession(s: FootballState, now: number): { home: number; away: number } | undefined {
-  if (!s.track?.possession || !s.possession) return undefined;
+  // NZI6: and only once the bar was tapped — fouls, tackles and corners hand
+  // the ball over on their own, which alone is no possession figure
+  if (!s.track?.possession || !s.possession || !s.possBar) return undefined;
   const acc = { ...s.possession.acc };
   if (s.possession.side && s.possession.sinceAt && now) acc[s.possession.side] += Math.max(0, now - s.possession.sinceAt);
   if (acc.home <= 0 || acc.away <= 0) return undefined;
