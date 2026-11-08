@@ -3,6 +3,8 @@ import { Text, View, ActivityIndicator, Platform, Linking, StyleSheet, useWindow
 import { House, CalendarDays, Trophy, Compass, CircleUserRound } from 'lucide-react-native';
 import { NavigationContainer, DefaultTheme, getStateFromPath, type LinkingOptions } from '@react-navigation/native';
 import { navRef } from './navRef';
+import { useSafeAreaInsets, initialWindowMetrics } from 'react-native-safe-area-context';
+import { tabBarBottom, TAB_BAR_BODY } from '../core/tabBarInset';
 import { promptSignIn, takePendingRoute } from '../core/guest';
 import { GuestBar } from '../components/GuestBar';
 import { createNativeStackNavigator, type NativeStackNavigationOptions } from '@react-navigation/native-stack';
@@ -285,12 +287,18 @@ function Tabs() {
   // Anyone can host a game or tournament at any time, so Organize is available
   // to every user — it's an entry point, not a privilege.
   useReminderEngine(); // host "no scorer" + scorer prep reminders
+  // android-nav-overlap.md: room for the phone's navigation keys, set here on Android
+  const insets = useSafeAreaInsets();
+  const navBottom = tabBarBottom(Platform.OS, insets.bottom, initialWindowMetrics?.insets.bottom ?? 0);
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         sceneStyle: readableContentStyle('Tabs'),
-        tabBarStyle: { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.surfaceAlt, height: Platform.OS === 'web' ? 64 : undefined, paddingTop: 6 },
+        tabBarStyle: {
+          backgroundColor: theme.colors.surface, borderTopColor: theme.colors.surfaceAlt, paddingTop: 6,
+          ...(navBottom !== null ? { height: TAB_BAR_BODY + navBottom, paddingBottom: navBottom } : { height: Platform.OS === 'web' ? 64 : undefined }),
+        },
         tabBarActiveTintColor: theme.colors.text,
         tabBarInactiveTintColor: theme.colors.textMuted,
         tabBarLabelStyle: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },

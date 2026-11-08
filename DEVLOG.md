@@ -38,6 +38,18 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Android: the phone's navigation keys no longer cover the tab bar
+
+A friend's Android phone (3-button navigation) showed the back / home / recents keys over the app's bottom tabs (android-nav-overlap.md). Android 15 draws apps edge to edge behind a translucent navigation bar. The tab bar should add that bar's height, but on this phone the inset reached it as 0, while the top inset was fine.
+- **Fix:**
+  - On Android the tab bar's height and bottom padding now come straight from the app-level safe-area inset, falling back to the inset measured at launch, whichever is larger (`src/core/tabBarInset.ts`).
+  - Set explicitly, so there's no double gap. iPhone and web are unchanged.
+- **Checks:**
+  - `tests/android-nav-overlap.test.mts`;
+  - full suite 7890 (0 failing);
+  - tsc.
+  - It can't be seen on the web; it needs that phone to confirm.
+
 ### 2026-11-08 — Release: wave 1 (no false zeros), session sport row, contacts picker (web, Android OTA)
 
 auth-smoke passed and the publish lock was taken. Published from a clean worktree at 6d5a24cc.
