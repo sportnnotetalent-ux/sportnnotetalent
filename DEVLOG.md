@@ -38,6 +38,14 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Release: top bar, Your sports page, name-only screens (web, Android OTA)
+
+auth-smoke passed and the publish lock was taken. Published from a clean worktree at 51f6915b.
+- **Web:** `index-dea45f0c`, live on app.sportnnote.in.
+- **Android OTA:** `29c56002` (preview) / `e18994b7` (production).
+- **Includes:** name-only app screens (010dbf7b) and the top bar / Your sports / no tournament filter (51f6915b).
+- **Not in this release:** "Organize a game" preselecting the sport (e0a7e3fc), committed after it.
+
 ### 2026-11-08 — "Organize a game" from a sport page starts with that sport
 
 The founder found that Your sports → a sport → "＋ Organize a game" asked for the sport again. The sport page now passes its sport, so match setup opens with it already chosen (home-sports.md HS7).
