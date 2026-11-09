@@ -147,6 +147,9 @@ console and dashboard code.
 2. Talent database: copy the schema, switch the live-project names listed in
    §1, then add schools, licences, memberships with Talent roles, the phone
    allow-list login check, and seat caps (test-first per the quality mandate).
+   **Built and tested 2026-11-09** (migration `20261117120000_talent_foundations`,
+   spec docs/talent/schema-foundations.md, breaks docs/security/breaks/talent-foundations.md).
+   Not applied yet: the founder runs docs/talent/RUNBOOK-apply-schema.md.
 3. App: phone-OTP-only login; role-based tabs; hide parental proof; parent
    sports-profile edit; multi-school child switcher.
 4. CRM website: sign-in, staff management, bulk upload, Org Leader rules.
