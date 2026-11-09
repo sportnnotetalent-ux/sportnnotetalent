@@ -4,7 +4,7 @@
 // (worker/index.ts, MVP 2026-10-31; Cloudflare steps in docs/launch/live-link.md).
 // The app itself is NOT deployed here (it's on EAS Hosting).
 {
-  "name": "sportnnote",
+  "name": "sportnnote-talent",
   "compatibility_date": "2026-10-01",
   "main": "worker/index.ts",
   "assets": {
@@ -22,7 +22,7 @@
     // MVP L8: the whole app is served here (founder switched the route on
     // 2026-10-31), so "Full match & stats" stays on our domain.
     "APP_ORIGIN": "https://app.sportnnote.in",
-    "SUPABASE_URL": "https://mpgbvbylmkwasjgupsbq.supabase.co",
-    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wZ2J2YnlsbWt3YXNqZ3Vwc2JxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMjIxNDQsImV4cCI6MjEwMTU5ODE0NH0.NV7ryMBv-qAc7OzHZVPPxXY2J3agtlHRbvS55R6sWXw"
+    "SUPABASE_URL": "SET-WHEN-TALENT-SUPABASE-EXISTS",
+    "SUPABASE_ANON_KEY": "SET-WHEN-TALENT-SUPABASE-EXISTS"
   }
 }

@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 /** Reference-video batch 2 (docs/security/breaks/reference-batch-2.md). */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,7 +12,7 @@ import { prefillCity } from '../src/core/prefill.ts';
 import { withOfficial } from '../src/data/matchOfficials.ts';
 
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('..', import.meta.url));
 const walk = (dir: string): string[] => readdirSync(dir).flatMap((f) => {
   const p = join(dir, f);
   return statSync(p).isDirectory() ? walk(p) : /\.tsx?$/.test(p) ? [p] : [];

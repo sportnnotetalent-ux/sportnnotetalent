@@ -14,7 +14,7 @@
  *
  * Contract:  GET /join-club?c=<token>   -> text/plain instructions
  * Deploy:    npx supabase functions deploy join-club --no-verify-jwt \
- *              --project-ref mpgbvbylmkwasjgupsbq
+ *              --project-ref byjuxrajzvfjpnqvzwzv
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 

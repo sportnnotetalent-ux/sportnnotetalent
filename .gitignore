@@ -50,3 +50,6 @@ dist-ota/
 website/dist/
 dist-size/
 dist-off/
+
+# Talent: the plain .env holds the Talent Supabase URL + anon key
+.env

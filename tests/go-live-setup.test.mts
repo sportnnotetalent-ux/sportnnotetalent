@@ -32,7 +32,7 @@ describe('Android phone sign-in (React Native Firebase)', () => {
     assert.match(src, /const token = await m\.auth\.getIdToken\(current\);\s*await m\.auth\.signOut\(auth\);/);
     assert.match(src, /satisfies WebApi/);
   });
-  test('the APK build includes the Firebase plugins', () => {
+  test('the APK build includes the Firebase plugins', { todo: 'Talent: needs its own Firebase project (docs/talent/PLAN.md §1)' }, () => {
     // the app plugin carries options since 2026-11-01 (iOS: disableSPM), so accept either form
     const has = (n: string) => appJson.plugins.some((p: unknown) => p === n || (Array.isArray(p) && p[0] === n));
     assert.ok(has('@react-native-firebase/app'));
@@ -110,7 +110,7 @@ describe('Android App Links', () => {
   });
 });
 
-describe('nightly database backup', () => {
+describe('nightly database backup', { skip: 'Talent: backup workflow removed until Talent has its own database (docs/talent/PLAN.md §1)' }, () => {
   const wf = read('.github/workflows/db-backup.yml');
   const runbook = read('docs/ops/backups.md');
   test('current, Node 24 actions on a pinned runner; a pasted secret is tidied and checked', () => {

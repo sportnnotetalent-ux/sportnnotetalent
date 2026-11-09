@@ -1,3 +1,7 @@
+# This is SportnNote Talent (founder, 2026-11-09)
+
+This repo is SportnNote Talent, the schools-only copy of SportnNote. Read [docs/talent/PLAN.md](docs/talent/PLAN.md) first. Never touch the live SportnNote app, database, EAS project or website from here. The HANDOFF and memory docs below describe SportnNote and are background only.
+
 # Start here (founder, 2026-10-31)
 
 New session or new account: read [docs/HANDOFF.md](docs/HANDOFF.md) first. It covers what's live, what's next, the founder's working rules, and the previous assistant's notes (in docs/handoff/memory/).

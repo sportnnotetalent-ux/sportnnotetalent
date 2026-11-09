@@ -19,7 +19,7 @@ Notice trouble early. A short daily look, so nothing bad runs for days unseen.
 - **Auth:** note whether `scripts/auth-smoke.mjs` ran before the latest publish (DEVLOG release entry). Do not run it against live sign-in yourself unless the brief says so.
 
 ## Inputs
-- Live, read only: `npx supabase db query --remote=mpgbvbylmkwasjgupsbq --read-only` (counts: errors last 24 h, sign-ups, blocked sign-ups, reports).
+- Live, read only: `npx supabase db query --remote=byjuxrajzvfjpnqvzwzv --read-only` (counts: errors last 24 h, sign-ups, blocked sign-ups, reports).
 - `DEVLOG.md`, `docs/security/anti-scraping.md`, `docs/security/breaks/error-triage.md`.
 
 ## Outputs (only these)

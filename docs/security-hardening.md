@@ -142,13 +142,13 @@ For minors, support's document approval is still a human gate.
    the same time.
 3. **Secrets:**
    ```bash
-   npx supabase secrets set WEBHOOK_SECRET=<long random string> --project-ref mpgbvbylmkwasjgupsbq
+   npx supabase secrets set WEBHOOK_SECRET=<long random string> --project-ref byjuxrajzvfjpnqvzwzv
    ```
    Optional: `CRON_SECRET=<random>` if you'd rather not put the service-role key in the
    cron job.
 4. **Deploy the changed functions.** `_shared/` is bundled automatically:
    ```bash
-   for f in push-send support-assistant support-escalate send-invite verification-submit notify-followers notify-upcoming message-notify guardian-link send-contact-otp verify-contact-otp verify-phone-firebase; do npx supabase functions deploy $f --project-ref mpgbvbylmkwasjgupsbq; done
+   for f in push-send support-assistant support-escalate send-invite verification-submit notify-followers notify-upcoming message-notify guardian-link send-contact-otp verify-contact-otp verify-phone-firebase; do npx supabase functions deploy $f --project-ref byjuxrajzvfjpnqvzwzv; done
    ```
 5. **Webhook / cron** (when you set up background push): add the HTTP header
    `x-webhook-secret: <WEBHOOK_SECRET>` to the `stat_lines` → `notify-followers` webhook.

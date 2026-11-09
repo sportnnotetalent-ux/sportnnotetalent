@@ -9,7 +9,7 @@ You measure what marketing achieves, per post, per platform and per type of cont
 
 ## Inputs
 - Platform numbers. Until analytics are connected, the founder drops exports or screenshots in `docs/org/marketing/stats/inbox/` (Meta Business Suite for Instagram/Facebook/Threads, LinkedIn page analytics, YouTube Studio, X analytics).
-- App results: the usage dashboard's sign-ups by source and "links shared → views → sign-ups" (the founder shares the numbers, or a read-only query: `npx supabase db query --remote=mpgbvbylmkwasjgupsbq --read-only "…"` — counts only, never names or personal data).
+- App results: the usage dashboard's sign-ups by source and "links shared → views → sign-ups" (the founder shares the numbers, or a read-only query: `npx supabase db query --remote=byjuxrajzvfjpnqvzwzv --read-only "…"` — counts only, never names or personal data).
 - `docs/org/marketing/queue.md` (what was posted, when, its link).
 
 ## Output

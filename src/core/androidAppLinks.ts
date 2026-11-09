@@ -11,7 +11,7 @@
  * No imports: the website build loads this file with Node's type stripping.
  */
 
-export const ANDROID_PACKAGE = 'in.sportnnote.app';
+export const ANDROID_PACKAGE = 'in.sportnnote.talent';
 
 /** SHA-256 of the key that signs the APK (EAS keystore, APK 39 onwards). When
  *  the app goes on Google Play with Play App Signing, add Play's app-signing

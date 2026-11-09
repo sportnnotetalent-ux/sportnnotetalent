@@ -113,7 +113,7 @@ select cron.unschedule('verification-reminders')
 select cron.schedule(
   'verification-reminders', '15 * * * *',
   $$ select net.http_post(
-       url := 'https://mpgbvbylmkwasjgupsbq.supabase.co/functions/v1/verification-reminders',
+       url := 'https://byjuxrajzvfjpnqvzwzv.supabase.co/functions/v1/verification-reminders',
        headers := jsonb_build_object(
          'Content-Type', 'application/json',
          'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'functions_anon_key'),

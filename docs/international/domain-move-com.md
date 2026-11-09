@@ -31,9 +31,9 @@ Deploy the functions that now read `_shared/hosts.ts`. This also fixes email inv
 until now `send-invite` only accepted `https://sportnnote.in/` links, so invite links to
 `app.sportnnote.in/i/…` were refused and the app fell back to opening the mail app.
 ```
-npx supabase functions deploy send-invite notify-upcoming support-assistant --project-ref mpgbvbylmkwasjgupsbq
-npx supabase functions deploy join --no-verify-jwt --project-ref mpgbvbylmkwasjgupsbq
-npx supabase functions deploy report-invite --no-verify-jwt --project-ref mpgbvbylmkwasjgupsbq
+npx supabase functions deploy send-invite notify-upcoming support-assistant --project-ref byjuxrajzvfjpnqvzwzv
+npx supabase functions deploy join --no-verify-jwt --project-ref byjuxrajzvfjpnqvzwzv
+npx supabase functions deploy report-invite --no-verify-jwt --project-ref byjuxrajzvfjpnqvzwzv
 ```
 No secrets are needed: the defaults are today's hosts.
 
@@ -89,7 +89,7 @@ App Links need the app host to answer directly, not with a redirect, so don't co
 ### 6. Edge functions: accept .com links
 1. `supabase secrets set EXTRA_LINK_ORIGINS=https://sportnnote.com,https://www.sportnnote.com,https://app.sportnnote.com`
 2. Redeploy `send-invite` so it picks up the secret:
-   `npx supabase functions deploy send-invite --project-ref mpgbvbylmkwasjgupsbq`
+   `npx supabase functions deploy send-invite --project-ref byjuxrajzvfjpnqvzwzv`
 
 ### 7. The app: accept .com deep links before anyone shares one
 1. Add to `.env.local.bak` (and the EAS environment):

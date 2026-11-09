@@ -81,7 +81,7 @@ Nothing below happens without the founder's explicit yes, given in chat or writt
 
 1. **Anything public:** posting on social media, publishing web or app updates, emails to users, website changes. Marketing works as a **queue**: agents prepare, the founder approves **every post** and publishes it (founder decision 2026-11-05; direct posting comes later).
 2. **Money and builds:** paid promotion, subscriptions, API plans (e.g. X API), build credits, new native or store builds, edge-function deploys.
-3. **The live database:** agents read only (`npx supabase db query --remote=mpgbvbylmkwasjgupsbq --read-only "…"`), **counts and aggregates only, never rows of personal data**; the founder runs every SQL change.
+3. **The live database:** agents read only (`npx supabase db query --remote=byjuxrajzvfjpnqvzwzv --read-only "…"`), **counts and aggregates only, never rows of personal data**; the founder runs every SQL change.
 4. **Accounts and credentials:** agents never create accounts, sign in, or handle passwords, keys or tokens. The founder does those.
 5. **Security can block** a release or a post. Only the founder can override a block.
 

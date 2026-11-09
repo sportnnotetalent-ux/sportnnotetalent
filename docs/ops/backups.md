@@ -30,7 +30,7 @@ The Supabase free plan keeps **no backup we can download or restore from**. Unti
 
 1. **The connection string.**
    - In the Supabase dashboard, open the live project → **Connect** (top bar) → **Session pooler** → copy the URI.
-   - It looks like `postgresql://postgres.mpgbvbylmkwasjgupsbq:[YOUR-PASSWORD]@aws-…pooler.supabase.com:5432/postgres`.
+   - It looks like `postgresql://postgres.byjuxrajzvfjpnqvzwzv:[YOUR-PASSWORD]@aws-…pooler.supabase.com:5432/postgres`.
    - Use the **session pooler**, not "Direct": GitHub's machines have no IPv6.
 2. **The password.**
    - If you don't know the database password, go to **Project Settings → Database → Reset database password**. Nothing in the app or the functions uses it, so resetting is safe.

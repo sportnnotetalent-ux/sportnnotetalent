@@ -1,15 +1,14 @@
 {
   "expo": {
-    "name": "SportnNote",
-    "slug": "sportnnote",
+    "name": "SportnNote Talent",
+    "slug": "sportnnote-talent",
     "version": "1.0.0",
-    "scheme": "sportnnote",
+    "scheme": "sportnnotetalent",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "bundleIdentifier": "in.sportnnote.app",
-      "googleServicesFile": "./GoogleService-Info.plist",
+      "bundleIdentifier": "in.sportnnote.talent",
       "supportsTablet": true,
       "infoPlist": {
         "NSMicrophoneUsageDescription": "SportnNote uses the microphone for hands-free voice scoring. Audio isn’t recorded or uploaded by SportnNote — only the recognized words are used.",
@@ -21,7 +20,7 @@
       }
     },
     "android": {
-      "package": "in.sportnnote.app",
+      "package": "in.sportnnote.talent",
       "adaptiveIcon": {
         "backgroundColor": "#F3F0E8",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -33,7 +32,6 @@
         "RECORD_AUDIO"
       ],
       "predictiveBackGestureEnabled": false,
-      "googleServicesFile": "./google-services.json",
       "blockedPermissions": [
         "android.permission.WRITE_CONTACTS",
         "android.permission.ACCESS_FINE_LOCATION",
@@ -221,17 +219,9 @@
         }
       ]
     ],
-    "extra": {
-      "eas": {
-        "projectId": "68dfbfe5-0345-47c8-8a13-65246aa42fc3"
-      }
-    },
-    "owner": "sportnnote.in",
+    "extra": {},
     "runtimeVersion": {
       "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/68dfbfe5-0345-47c8-8a13-65246aa42fc3"
     }
   }
 }

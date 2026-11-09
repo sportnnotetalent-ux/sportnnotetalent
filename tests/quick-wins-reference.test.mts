@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 /** Reference-video quick wins + silent launch animation
  *  (docs/security/breaks/quick-wins-reference.md). */
 import { test } from 'node:test';
@@ -13,7 +14,7 @@ const walk = (dir: string): string[] => readdirSync(dir).flatMap((f) => {
   const p = join(dir, f);
   return statSync(p).isDirectory() ? walk(p) : p.endsWith('.tsx') ? [p] : [];
 });
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('..', import.meta.url));
 
 // ---------- B1: lime only when asked ----------
 test('QW3: a Button with no variant is the outline style, not lime', () => {
