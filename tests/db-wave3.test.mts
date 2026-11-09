@@ -46,6 +46,10 @@ describe('DB-08 — internal functions are not callable by the app', () => {
       'is_tie_host',                    // the caller's own host status
       'usage_dashboard',                // v1 usage dashboard: app versions before the filters (support only)
       'share_scope',                    // signed-out scope: called by share_ids() inside the anon read policies (ids only)
+      // Talent (docs/talent/schema-foundations.md): each checks its caller's role itself;
+      // the CRM and app screens that call them are PLAN §8 steps 3–5.
+      'talent_create_school', 'talent_set_licences', 'talent_add_member', 'talent_remove_member',
+      'talent_add_student', 'talent_remove_student', 'talent_attach_me',
     ]);
     const used = (await db.sql<{ t: string }>(`
       select coalesce(qual, '') || ' ' || coalesce(with_check, '') as t from pg_policies
