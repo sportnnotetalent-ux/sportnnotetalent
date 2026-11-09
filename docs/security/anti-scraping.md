@@ -50,7 +50,7 @@ limit 20
 - If a field name isn't recognised, open any single log row in **Logs → API Gateway** to see the exact header names (`x_real_ip` / `cf_connecting_ip`) and adjust.
 - A normal app user makes a few hundred requests a day. Thousands of requests from one IP, many different paths, or a tool User-Agent means scraping.
 - If the requests carry a signed-in user's token, the account can also be blocked.
-- **Your own IP:** open `https://byjuxrajzvfjpnqvzwzv.supabase.co/rest/v1/rpc/api_whoami?apikey=<anon key>` in a browser. The anon key is the public one in the app. This shows what the API sees for you, so you don't block yourself.
+- **Your own IP:** open `https://mjzywmnglxyijjebzfcj.supabase.co/rest/v1/rpc/api_whoami?apikey=<anon key>` in a browser. The anon key is the public one in the app. This shows what the API sees for you, so you don't block yourself.
 
 ## Block, unblock, pause
 

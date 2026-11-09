@@ -5,7 +5,7 @@ Everything the founder does by hand before or at go-live, in one place. Code wor
 ## Before the India launch (11 Jan 2027)
 
 - [x] **Daily ID-proof cleanup job.** Done 2026-10-12 (job 4, active). This deletes uploaded ID documents 30 days after they are reviewed, as the privacy policy promises.
-  1. Supabase dashboard → the **Talent** project (`byjuxrajzvfjpnqvzwzv`) → **SQL Editor** → **New query**.
+  1. Supabase dashboard → the **Talent** project (`mjzywmnglxyijjebzfcj`) → **SQL Editor** → **New query**.
   2. Paste the block below and click **Run**. It should return one number, which is the job id.
   3. To check it worked: `select jobname, schedule from cron.job where jobname = 'privacy-retention';` should return one row.
 
@@ -13,7 +13,7 @@ Everything the founder does by hand before or at go-live, in one place. Code wor
   select cron.schedule(
     'privacy-retention', '30 3 * * *',
     $$ select net.http_post(
-         url := 'https://byjuxrajzvfjpnqvzwzv.supabase.co/functions/v1/privacy-retention',
+         url := 'https://mjzywmnglxyijjebzfcj.supabase.co/functions/v1/privacy-retention',
          headers := jsonb_build_object(
            'Content-Type', 'application/json',
            'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'functions_anon_key'),
@@ -75,7 +75,7 @@ All free, except SMS, which is already pay-as-you-go. Do them in this order. Ste
 - [x] **6. Uptime alerts (UptimeRobot, free).** *Done 2026-10-26: three monitors (website, app, server auth health), all green.* uptimerobot.com → free account → **New monitor**, type HTTP(s), every 5 minutes, alert by email. Three monitors:
   - `https://sportnnote.in`
   - `https://app.sportnnote.in`
-  - Supabase: `https://byjuxrajzvfjpnqvzwzv.supabase.co/auth/v1/health?apikey=<the anon key>`. Use the public anon key from `.env.local.bak` (`EXPO_PUBLIC_SUPABASE_…KEY`); it is the same key every browser already gets.
+  - Supabase: `https://mjzywmnglxyijjebzfcj.supabase.co/auth/v1/health?apikey=<the anon key>`. Use the public anon key from `.env.local.bak` (`EXPO_PUBLIC_SUPABASE_…KEY`); it is the same key every browser already gets.
 
   Don't add a monitor on `/rest/v1/…`: the anti-scraping gate rightly blocks robots there.
 - [x] **7. Google Search Console (free).** *Done 2026-10-26: Domain property verified (TXT record), sitemap submitted as the full URL `https://sportnnote.in/sitemap.xml` (a Domain property won't take just `sitemap.xml`); Google has discovered the guides.* search.google.com/search-console → **Add property** → **Domain** `sportnnote.in` → add the TXT record it shows in Cloudflare DNS → **Verify** → **Sitemaps** → submit `https://sportnnote.in/sitemap.xml`. The guides then show up in Google search sooner.

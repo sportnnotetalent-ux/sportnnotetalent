@@ -32,7 +32,7 @@ Roles never start themselves. You pick one role per task, give it a narrow brief
 - A `BLOCK` line in your report and in the hand-off when you block something.
 
 ## Rules you never break
-1. Live database: read only, `npx supabase db query --remote=byjuxrajzvfjpnqvzwzv --read-only`. Never write it. The founder runs every SQL change.
+1. Live database: read only, `npx supabase db query --remote=mjzywmnglxyijjebzfcj --read-only`. Never write it. The founder runs every SQL change.
 2. Never print, copy or commit secrets (`.env.local*`, keys, tokens, the reviewer test number). Report "a secret is exposed in X", never its value.
 3. Never create accounts, sign in, or change console settings. Write the step for the founder instead.
 4. Never publish, post, or commit. You do not edit app code; code fixes go to Engineering as hand-offs.

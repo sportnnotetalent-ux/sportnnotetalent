@@ -13,7 +13,7 @@
  * Older messages carry this link, so it keeps working forever.
  *
  * Deploy:    npx supabase functions deploy join --no-verify-jwt \
- *              --project-ref byjuxrajzvfjpnqvzwzv
+ *              --project-ref mjzywmnglxyijjebzfcj
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { APP_URL } from '../_shared/hosts.ts'; // SD-151: APP_URL secret, default app.sportnnote.in

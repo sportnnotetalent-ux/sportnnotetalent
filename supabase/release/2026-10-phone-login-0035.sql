@@ -117,7 +117,7 @@ commit;
 -- Stop it later with: select cron.unschedule('daily-digest');
 select cron.schedule('daily-digest', '30 15 * * *', $job$
   select net.http_post(
-    url := 'https://byjuxrajzvfjpnqvzwzv.supabase.co/functions/v1/weekly-report',
+    url := 'https://mjzywmnglxyijjebzfcj.supabase.co/functions/v1/weekly-report',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'functions_anon_key'),

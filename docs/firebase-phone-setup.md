@@ -29,8 +29,8 @@ EXPO_PUBLIC_FIREBASE_APP_ID=…
 ```
 And the server secret (after `npx supabase login`):
 ```
-npx supabase secrets set FIREBASE_PROJECT_ID=<projectId> --project-ref byjuxrajzvfjpnqvzwzv
-npx supabase functions deploy verify-phone-firebase --project-ref byjuxrajzvfjpnqvzwzv
+npx supabase secrets set FIREBASE_PROJECT_ID=<projectId> --project-ref mjzywmnglxyijjebzfcj
+npx supabase functions deploy verify-phone-firebase --project-ref mjzywmnglxyijjebzfcj
 ```
 
 ## How it works (for reference)

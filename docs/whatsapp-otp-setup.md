@@ -28,17 +28,17 @@ Meta Cloud API. We send the code inside an **approved authentication template**.
 Set on the project, then redeploy the function:
 
 ```bash
-npx supabase secrets set "WHATSAPP_TOKEN=YOUR_PERMANENT_TOKEN" --project-ref byjuxrajzvfjpnqvzwzv
-npx supabase secrets set "WHATSAPP_PHONE_NUMBER_ID=YOUR_PHONE_NUMBER_ID" --project-ref byjuxrajzvfjpnqvzwzv
+npx supabase secrets set "WHATSAPP_TOKEN=YOUR_PERMANENT_TOKEN" --project-ref mjzywmnglxyijjebzfcj
+npx supabase secrets set "WHATSAPP_PHONE_NUMBER_ID=YOUR_PHONE_NUMBER_ID" --project-ref mjzywmnglxyijjebzfcj
 # Optional — only if your template name/language differ from the defaults:
-npx supabase secrets set "WHATSAPP_OTP_TEMPLATE=sportnnote_otp" --project-ref byjuxrajzvfjpnqvzwzv
-npx supabase secrets set "WHATSAPP_TEMPLATE_LANG=en" --project-ref byjuxrajzvfjpnqvzwzv
+npx supabase secrets set "WHATSAPP_OTP_TEMPLATE=sportnnote_otp" --project-ref mjzywmnglxyijjebzfcj
+npx supabase secrets set "WHATSAPP_TEMPLATE_LANG=en" --project-ref mjzywmnglxyijjebzfcj
 ```
 
 ## Deploy the function
 
 ```bash
-npx supabase functions deploy send-contact-otp --project-ref byjuxrajzvfjpnqvzwzv
+npx supabase functions deploy send-contact-otp --project-ref mjzywmnglxyijjebzfcj
 ```
 
 ## How it behaves

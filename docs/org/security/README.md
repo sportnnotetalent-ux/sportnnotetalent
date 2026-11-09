@@ -34,7 +34,7 @@ Only the founder can override a Security BLOCK.
 A finding is done when the fix has a test that failed first, the test is in the suite, and the break doc says `fixed (test: <file>)` — or the founder accepted it in `decisions.md`.
 
 ## Rules (from the charter)
-- Live database: read only, `npx supabase db query --remote=byjuxrajzvfjpnqvzwzv --read-only`. The founder runs every SQL change.
+- Live database: read only, `npx supabase db query --remote=mjzywmnglxyijjebzfcj --read-only`. The founder runs every SQL change.
 - Never print, copy or commit secrets. Never create accounts or sign in.
 - We don't edit app code, publish or commit.
 - Not legal advice: compliance writes questions for the lawyer.

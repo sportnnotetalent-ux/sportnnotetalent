@@ -8,7 +8,7 @@ create extension if not exists pg_net;
 
 select cron.schedule('notify-upcoming', '*/5 * * * *', $job$
   select net.http_post(
-    url := 'https://byjuxrajzvfjpnqvzwzv.supabase.co/functions/v1/notify-upcoming',
+    url := 'https://mjzywmnglxyijjebzfcj.supabase.co/functions/v1/notify-upcoming',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'functions_anon_key'),

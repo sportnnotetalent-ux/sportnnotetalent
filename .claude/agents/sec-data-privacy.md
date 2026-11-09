@@ -20,7 +20,7 @@ Make sure each person sees only what they should. Under-18s are protected everyw
 ## Inputs
 - `supabase/migrations/` (always read the newest body of a function; grep all migrations).
 - `docs/security-hardening.md`, `docs/security/audit-2026-10-27/database.md`, `docs/security/wave2-consent-design.md`, `docs/security/cl03-parental-proof-design.md`, `docs/privacy/`.
-- Live facts, read only: `npx supabase db query --remote=byjuxrajzvfjpnqvzwzv --read-only` (e.g. tables without RLS, counts of under-18 profiles, documents older than 30 days). Counts only, never rows of personal data.
+- Live facts, read only: `npx supabase db query --remote=mjzywmnglxyijjebzfcj --read-only` (e.g. tables without RLS, counts of under-18 profiles, documents older than 30 days). Counts only, never rows of personal data.
 
 ## Outputs (only these)
 - For a change: findings added to that change's `docs/security/breaks/<slug>.md`.

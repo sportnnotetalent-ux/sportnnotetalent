@@ -14,7 +14,7 @@ const hours = Math.max(1, Math.min(24 * 14, Number(process.argv[2]) || 24));
 const sql = `select message, fatal, screen, platform, app_version, stack, at,
   (select min(c2.at) from client_errors c2 where c2.message = c.message) as first_seen
   from client_errors c where at > now() - interval '${hours} hours' order by at limit 2000`;
-const out = execFileSync('npx', ['supabase', 'db', 'query', '--linked', '--project-ref', 'byjuxrajzvfjpnqvzwzv', '-o', 'json', sql],
+const out = execFileSync('npx', ['supabase', 'db', 'query', '--linked', '--project-ref', 'mjzywmnglxyijjebzfcj', '-o', 'json', sql],
   { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 });
 const rows = JSON.parse(out).rows ?? [];
 

@@ -17,7 +17,7 @@ at the SportnNote repo for fetching fixes only, and pushing to it is disabled.
 | Bundle ID / Android package | in.sportnnote.app | in.sportnnote.talent |
 | EAS project + OTA updates | linked | **removed** — TODO: create a Talent EAS project |
 | Firebase (push) files | SportnNote's | **removed** — TODO: Talent Firebase project |
-| Supabase | live project `mpgbvbylmkwasjgupsbq` | Talent project `byjuxrajzvfjpnqvzwzv`, set in the local `.env` (gitignored). Schema not applied yet. Until the anon key is filled in, the app runs in demo mode |
+| Supabase | live project `mpgbvbylmkwasjgupsbq` | Talent project `mjzywmnglxyijjebzfcj` (Mumbai, ap-south-1; replaces an empty Seoul project made by mistake), set in the local `.env` (gitignored). Schema not applied yet, so the app has no working backend until the schema task lands |
 | Cloudflare worker | sportnnote | renamed sportnnote-talent, Supabase values blanked |
 | Web hosts (share links, app links) | app.sportnnote.in | unchanged for now. TODO: pick the Talent domain, set it through `EXPO_PUBLIC_APP_URL` / `EXPO_PUBLIC_SITE_URL` (src/core/hosts.ts) and the app.json intent filter |
 | Android app-links package | in.sportnnote.app | in.sportnnote.talent. TODO: replace SportnNote's signing-key fingerprints in src/core/androidAppLinks.ts with Talent's EAS key |
@@ -29,7 +29,7 @@ back on when Talent's Firebase and backup are set up.
 
 Live-project references (done 2026-11-09): every migration, release script,
 edge function, script, agent and how-to doc now names the Talent project
-`byjuxrajzvfjpnqvzwzv`. The two release cron scripts that hardcoded
+`mjzywmnglxyijjebzfcj`. The two release cron scripts that hardcoded
 SportnNote's anon key now read it from Vault (`functions_anon_key`). Only
 history docs still name SportnNote's `mpgbvbylmkwasjgupsbq`: DEVLOG.md,
 docs/HANDOFF.md, docs/handoff/memory/*, the 2026-10-24 API exposure audit
